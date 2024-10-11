@@ -73,3 +73,4 @@ function RunFunction {
 # Timer trigger to run the function periodically
 $Timer = $null
 RunFunction -Timer $Timer
+write-host "why!"
