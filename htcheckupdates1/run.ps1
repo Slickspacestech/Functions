@@ -21,7 +21,7 @@ function Send-Email {
     param (
         [string]$subject,
         [string]$version,
-        [string]$securePassword
+        $securePassword
     )
 
     # Define the email parameters
@@ -48,7 +48,7 @@ function RunFunction {
     # Retrieve the secure password from Azure Key Vault
     $vaultName = "huntertechvault"
     $secretName = "smtp2go-secure"
-    $securePassword = (Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue
+    $securePassword = ConvertTo-SecureString ((Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue) -AsPlainText -Force
     # Load the secure password from Azure Key Vault or a secure location
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
 
