@@ -11,10 +11,13 @@ if ($Timer.IsPastDue) {
 
 # Write an information log with the current time.
 Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
-# Import the required modules
+# Import the required modules 
+<#
 Import-Module Az.Accounts
 Import-Module Az.Functions
 Install-Module -Name Az.KeyVault -Force -Scope CurrentUser
+#>
+
 
 # Define the function to send an email
 function Send-Email {
