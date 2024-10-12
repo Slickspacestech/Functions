@@ -24,7 +24,7 @@ function Send-Email {
     param (
         [string]$subject,
         [string]$version,
-        $securePassword
+        [string]$securePassword
     )
 
     # Define the email parameters
@@ -36,7 +36,7 @@ function Send-Email {
     $body = "$subject, latest version is $version"
 
     # Create the credential object
-    $credential = New-Object System.Management.Automation.PSCredential ($smtpUser, $securePassword)
+    $credential = New-Object System.Management.Automation.PSCredential($smtpUser, $securePassword)
 
     # Send the email
     Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -Credential $credential -UseSsl
@@ -51,7 +51,7 @@ function RunFunction {
     # Retrieve the secure password from Azure Key Vault
     $vaultName = "huntertechvault"
     $secretName = "smtp2go-secure"
-    $securePassword = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
+    $securePassword = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -AsPlainText
     # Load the secure password from Azure Key Vault or a secure location
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
 
@@ -77,5 +77,8 @@ function RunFunction {
 
 # Timer trigger to run the function periodically
 $Timer = $null
+$vaultName = "huntertechvault"
+$latest = Get-AzKeyVaultSecret -VaultName $vaultName -Name "BBversion" -AsPlainText
 RunFunction -Timer $Timer
 write-host "why!"
+write-host $latest
