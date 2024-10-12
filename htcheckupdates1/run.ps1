@@ -52,7 +52,7 @@ function RunFunction {
     $vaultName = "huntertechvault"
     $secretName = "smtp2go-secure"
     $smtp2gopass = (Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue
-    write-host $smtp2gopass
+    Write-Debug $smtp2gopass
     $securePassword = ConvertTo-SecureString ((Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue) -AsPlainText -Force
     # Load the secure password from Azure Key Vault or a secure location
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
@@ -70,7 +70,7 @@ function RunFunction {
     }
 
     if ($latest -ne $firstLiItem) {
-        set-azkeyvaultSecret -VaultName $vaultName -secretValue (ConvertTo-SecureString $firstLiItem -AsPlainText -Force)
+        set-azkeyvaultSecret -VaultName $vaultName -Name $secretName  -secretValue (ConvertTo-SecureString $firstLiItem -AsPlainText -Force)
         #$firstLiItem | Out-File -FilePath "C:\home\site\wwwroot\temp\bluebeam_version.txt" -Force
         Send-Email -subject "Bluebeam Update Released" -version $firstLiItem -securePassword $securePassword
     }
