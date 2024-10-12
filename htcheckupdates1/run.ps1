@@ -53,11 +53,12 @@ function RunFunction {
     $secretName = "smtp2go-secure"
     $smtp2gopass = (Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue
     Write-Debug $smtp2gopass
-    $securePassword = ConvertTo-SecureString ((Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue) -AsPlainText -Force
+    $securePassword = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -AsPlainText
     # Load the secure password from Azure Key Vault or a secure location
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
 
-    $latest = (Get-AzKeyVaultSecret -VaultName $vaultName -Name "BBversion").SecretValue
+    $latest = Get-AzKeyVaultSecret -VaultName $vaultName -Name "BBversion" -AsPlainText
+    write-host "latest in vault is $latest"
     $url = "https://support.bluebeam.com/en-us/release-notes-all.html"
 
     # Load the HTML content from the URL
