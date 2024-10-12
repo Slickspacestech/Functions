@@ -51,9 +51,7 @@ function RunFunction {
     # Retrieve the secure password from Azure Key Vault
     $vaultName = "huntertechvault"
     $secretName = "smtp2go-secure"
-    $smtp2gopass = (Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName).SecretValue
-    Write-Debug $smtp2gopass
-    $securePassword = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -AsPlainText
+    $securePassword = Get-AzKeyVaultSecret -VaultName $vaultName -Name $secretName
     # Load the secure password from Azure Key Vault or a secure location
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
 
