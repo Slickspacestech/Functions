@@ -42,6 +42,22 @@ function Send-Email {
     Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -Credential $credential -UseSsl
 }
 
+function getBlueBeamLatest {
+    param($currentVersion)
+    write-host "latest in vault is $latest"
+    $url = "https://support.bluebeam.com/en-us/release-notes-all.html"
+
+    # Load the HTML content from the URL
+    $html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing
+    $found = $html -match '<p>Revu.+?(?=<)'
+    if ($found) {
+        $firstLiItem = ([string]$Matches.Values).Replace("<p>Revu ", "")
+        return $firstLiItem
+    }else{
+        return $null
+    }
+}
+
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
@@ -56,23 +72,19 @@ function RunFunction {
     #$securePassword = Get-Content -Path "C:\home\site\wwwroot\secure\smtp2go-secure.txt" | ConvertTo-SecureString
 
     $latest = Get-AzKeyVaultSecret -VaultName $vaultName -Name "BBversion" -AsPlainText
-    write-host "latest in vault is $latest"
-    $url = "https://support.bluebeam.com/en-us/release-notes-all.html"
+    
+    $bluebeam_latest = getBlueBeamLatest $latest
 
-    # Load the HTML content from the URL
-    $html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing
-
-    $found = $html -match '<p>Revu.+?(?=<)'
-
-    if ($found) {
-        $firstLiItem = ([string]$Matches.Values).Replace("<p>Revu ", "")
+    if (!($bluebeam_latest)){  
+        Send-Email -subject "Bluebeam failed to parse website" -version "0.0" -securePassword $securePassword
+    }else{
+        if ($bluebeam_latest -gt $latest){
+            set-azkeyvaultSecret -VaultName $vaultName -Name "BBversion"  -secretValue (ConvertTo-SecureString $firstLiItem -AsPlainText -Force)
+            Send-Email -subject "Bluebeam New Update!" -version $bluebeam_latest -securePassword $securePassword
+        }
+        
     }
-
-    if ($latest -ne $firstLiItem) {
-        set-azkeyvaultSecret -VaultName $vaultName -Name "BBversion"  -secretValue (ConvertTo-SecureString $firstLiItem -AsPlainText -Force)
-        #$firstLiItem | Out-File -FilePath "C:\home\site\wwwroot\temp\bluebeam_version.txt" -Force
-        Send-Email -subject "Bluebeam Update Released ($latest)" -version $firstLiItem -securePassword $securePassword
-    }
+        
 }
 
 # Timer trigger to run the function periodically
