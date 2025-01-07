@@ -79,7 +79,7 @@ function RunFunction {
         Send-Email -subject "Bluebeam failed to parse website" -version "0.0" -securePassword $securePassword
     }else{
         if ($bluebeam_latest -gt $latest){
-            set-azkeyvaultSecret -VaultName $vaultName -Name "BBversion"  -secretValue (ConvertTo-SecureString $firstLiItem -AsPlainText -Force)
+            set-azkeyvaultSecret -VaultName $vaultName -Name "BBversion"  -secretValue (ConvertTo-SecureString $bluebeam_latest -AsPlainText -Force)
             Send-Email -subject "Bluebeam New Update!" -version $bluebeam_latest -securePassword $securePassword
         }
         
