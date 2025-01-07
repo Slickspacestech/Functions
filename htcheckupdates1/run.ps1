@@ -24,7 +24,8 @@ function Send-Email {
     param (
         [string]$subject,
         [string]$version,
-        $securePassword
+        $securePassword,
+        [string]$previous
     )
 
     # Define the email parameters
@@ -33,7 +34,7 @@ function Send-Email {
     $smtpUser = "patching@huntertech.ca"
     $from = "patching@huntertech.ca"
     $to = "matt@huntertech.ca"
-    $body = "$subject, latest version is $version"
+    $body = "$subject, latest version is $version, the previous version was: $previous "
 
     # Create the credential object
     $credential = New-Object System.Management.Automation.PSCredential($smtpUser, $securePassword)
@@ -58,6 +59,35 @@ function getBlueBeamLatest {
     }
 }
 
+function getAutodeskLatest {
+    param(
+        $product,
+        $year
+    )
+    #https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-LT-ReleaseNotes/files/AUTOCADLT_2025_UPDATES.html
+    #https://help.autodesk.com/cloudhelp/2025/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_2025updates_html.html
+    #https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-ReleaseNotes/files/AUTOCAD_2025_UPDATES.html
+    #https://help.autodesk.com/cloudhelp/2025/ENU/RevitReleaseNotes/files/RevitReleaseNotes_2025updates_html.html
+
+    switch($product){
+        "RVT" {$url = "https://help.autodesk.com/cloudhelp/YEAR/ENU/RevitReleaseNotes/files/RevitReleaseNotes_YEARupdates_html.html".Replace("YEAR",$year)}
+        "RVTLT" {$url = "https://help.autodesk.com/cloudhelp/YEAR/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_YEARupdates_html.html".Replace("YEAR",$year)}
+        "ACD" {$url = "https://help.autodesk.com/cloudhelp/YEAR/ENU/AutoCAD-ReleaseNotes/files/AUTOCAD_YEAR_UPDATES.html".Replace("prod",$product).Replace("YEAR",$year)}
+        "ACDLT" {$url = "https://help.autodesk.com/cloudhelp/YEAR/ENU/AutoCAD-LT-ReleaseNotes/files/AUTOCADLT_YEAR_UPDATES.html".Replace("YEAR",$year)}
+    }
+    $html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing
+    try {
+        $updates = $html.html.body.div.ul.li.a
+    }catch {
+        write-host "unable to parse html xml object"
+    }
+    
+    $latest = $updates[0].'#text'.replace(" Update","")
+    return $latest
+    #$found = $html -match '<p>Revu.+?(?=<)'
+
+}
+
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
@@ -76,14 +106,73 @@ function RunFunction {
     $bluebeam_latest = getBlueBeamLatest $latest
 
     if (!($bluebeam_latest)){  
-        Send-Email -subject "Bluebeam failed to parse website" -version "0.0" -securePassword $securePassword
+        Send-Email -subject "Bluebeam failed to parse website" -version "0.0" -previous $latest -securePassword $securePassword
     }else{
         if ($bluebeam_latest -gt $latest){
             set-azkeyvaultSecret -VaultName $vaultName -Name "BBversion"  -secretValue (ConvertTo-SecureString $bluebeam_latest -AsPlainText -Force)
-            Send-Email -subject "Bluebeam New Update!" -version $bluebeam_latest -securePassword $securePassword
+            Send-Email -subject "Bluebeam New Update!" -version $bluebeam_latest -previous $latest -securePassword $securePassword
         }
         
     }
+
+    $autodesk_products = @(
+        @{
+            "product" = "ACDLT"
+            "year" = "2024"
+        }, 
+        @{
+            "product" = "ACDLT"
+            "year" = "2025"
+        },
+        @{
+            "product" = "ACD"
+            "year" = "2024"
+        },
+        @{
+            "product" = "ACD"
+            "year" = "2025"
+        },
+        @{
+            "product" = "RVT"
+            "year" = "2024"
+        },
+        @{
+            "product" = "RVT"
+            "year" = "2025"
+        },
+        @{
+            "product" = "RVT"
+            "year" = "2023"
+        },
+        @{
+            "product" = "RVTLT"
+            "year" = "2023"
+        },
+        @{
+            "product" = "RVTLT"
+            "year" = "2024"
+        },
+        @{
+            "product" = "RVTLT"
+            "year" = "2025"
+        }
+    )
+        foreach ($item in $autodesk_products) {
+            $currentVersion = Get-AzKeyVaultSecret -VaultName $vaultName -Name "$($item.product)$($item.year)" -AsPlainText
+            
+            $latest_update = $null
+            $latest_update = getAutodeskLatest $item.product $item.year
+
+            if (!($currentVersion)){
+                Set-AzKeyVaultSecret -VaultName $vaultName -Name "$($item.product)$($item.year)" -SecretValue (ConvertTo-SecureString $latest_update -AsPlainText -Force)
+            } else{
+                if ($currentVersion -lt $latest_update){
+                    Set-AzKeyVaultSecret -VaultName $vaultName -Name "$($item.product)$($item.year)" -SecretValue (ConvertTo-SecureString $latest_update -AsPlainText -Force)
+                    Send-Email -subject "$($item.product) $($item.year) New Update!" -version $latest_update -previous $currentVersion -securePassword $securePassword
+                }
+            }
+            
+        }
         
 }
 
