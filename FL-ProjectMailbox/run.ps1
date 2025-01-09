@@ -26,6 +26,7 @@ Install-Module -Name Az.KeyVault -Force -Scope CurrentUser
 #>
 
 
+
 # Define the function to send an email
 function Send-Email {
     param (
