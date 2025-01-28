@@ -2,8 +2,8 @@
 # See https://aka.ms/functionsmanageddependency for additional information.
 #
 @{
-    'Az' = '9.*',
-    'Microsoft.Graph' = '1.*',
-    'ImportExcel' = '7.*',
+    'Az' = '9.*'
+    'Microsoft.Graph' = '1.*'
+    'ImportExcel' = '7.*'
     'Pnp.powershell' = '2.*'
 }
