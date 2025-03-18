@@ -73,11 +73,11 @@ function safe_create_folder(){
 }
 
 function create_rule(){
-    params(
+    param(
         $sequence,
         $folderid,
         $displayName,
-        $project_string
+        $project_string,
         $userid
     )
     $rule = @{
@@ -125,31 +125,96 @@ function safe_create_rule(){
     return $projectRule
 }
 
-function get_transport_rule(){
-    Param(
-        $mailbox
+function safe_create_distribution_list {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$DisplayName,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$OwnerEmail,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$MemberEmail
     )
-    $rule = Get-TransportRule -Identity $mailbox -ErrorAction SilentlyContinue
-    return $rule
-}
-function safe_update_transport_rule(){
-    Param(
-        $transport_rule,
-        $project_code,
-        $mailbox
-    )
-    $rule = Get-TransportRule -Identity $mailbox -ErrorAction SilentlyContinue
-    if(!($rule)){
-        New-TransportRule -Name $mailbox -SubjectContainsWords $project_code -CopyTo $mailbox -StopRuleProcessing $true -Enabled $true -errorAction stop
-    }else{
-        $existingWords = $rule.SubjectContainsWords
-        $updatedWords = $existingWords + $project_code
-        set-transportrule $mailbox -SubjectContainsWords $updatedWords
+
+    try {
+        # Check if the distribution list exists
+        $existingGroup = Get-DistributionGroup -Identity $DisplayName -ErrorAction SilentlyContinue
+        
+        if ($existingGroup) {
+            Write-Host "Distribution list '$DisplayName' already exists."
+            
+            # Check if owner needs to be added
+            $currentOwners = Get-DistributionGroup -Identity $DisplayName | Select-Object -ExpandProperty ManagedBy
+            if ($currentOwners -notcontains $OwnerEmail) {
+                Add-DistributionGroupMember -Identity $DisplayName -Member $OwnerEmail -BypassSecurityGroupManagerCheck
+                Set-DistributionGroup -Identity $DisplayName -ManagedBy $OwnerEmail
+                Write-Host "Added owner: $OwnerEmail"
+            }
+            
+            # Check if member needs to be added
+            $currentMembers = Get-DistributionGroupMember -Identity $DisplayName | Select-Object -ExpandProperty PrimarySmtpAddress
+            if ($currentMembers -notcontains $MemberEmail) {
+                Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
+                Write-Host "Added member: $MemberEmail"
+            }
+            
+            return $existingGroup
+        }
+
+        # Create the distribution list
+        $newGroup = New-DistributionGroup -Name $DisplayName -DisplayName $DisplayName -ManagedBy $OwnerEmail -PrimarySmtpAddress "$DisplayName@firstlightenergy.ca"
+        Write-Host "Created new distribution list '$DisplayName'"
+
+        # Add member
+        Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
+        Write-Host "Added member: $MemberEmail"
+
+        return $newGroup
     }
-    $rule = Get-TransportRule -Identity $mailbox -ErrorAction SilentlyContinue
-
+    catch {
+        Write-Error "Error creating distribution list: $_"
+        return $null
+    }
 }
 
+function Get-RevuVersion {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Url
+    )
+
+    try {
+        # Create a web client to handle the request
+        $webClient = New-Object System.Net.WebClient
+        $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
+        
+        # Download the HTML content
+        $htmlContent = $webClient.DownloadString($Url)
+        
+        # Create a regex pattern to match content within p tags that contains "Revu" followed by version number
+        $pattern = '<p[^>]*>(?:(?!</p>).)*?Revu\s+(\d{2}\.\d\.\d)[^<]*</p>'
+        
+        # Find all matches
+        $matches = [regex]::Matches($htmlContent, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+        
+        if ($matches.Count -gt 0) {
+            foreach ($match in $matches) {
+                # Extract just the version number from the match
+                $versionNumber = $match.Groups[1].Value
+                Write-Host "Found Revu version: $versionNumber"
+                return $versionNumber
+            }
+        } else {
+            Write-Host "No Revu version in format ##.#.# found in the specified URL"
+            return $null
+        }
+    }
+    catch {
+        Write-Error "Error parsing URL: $_"
+        return $null
+    }
+}
 
 # Main function to be triggered by the Azure Function
 function RunFunction {
@@ -174,35 +239,32 @@ function RunFunction {
     Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile
     $projects = import-excel -Path D:\local\projects.xlsx
     $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
-    $transport_rule = get_transport_rule $mailbox
-    $size = $transport_rule.Size
-    if ($size -gt 7500){
-        Send-Email -subject "Rule Size $size" -securePassword $smtp2go -version " " -Body "TransportRule for $mailbox has reached $size bytes, maximum is 8192"
-    }
-    #check mailbox exists
-    #check rule count lt 500
-    #possibly create new mailbox
+    
     foreach ($project in $projects){
         $projectCode = $project.'Project #'.trim()
         $projectName = $project.'Project Name'.trim()
         
         $name = "$projectCode-$projectName"
         $folder = safe_create_folder $name
-        
-        if ($folder){
-            $mb_rule = safe_create_rule $folder.id $projectCode #left off here
-        }
-        if($mb_rule){
-            safe_update_transport_rule $transport_rule $projectCode, $mailbox
-        }
-        
-    }
-    #goal is to read the csv or xlsx, connect to graph, check for/create a folder for each item in the shared mailbox
-    #create the mailbox rule to move the item to the correct folder
-    #update transport rule to include the new subject string to match on
-    # also should check rule count, create new mailbox + new transport rule if above 500, nm total rule size is probably 500 at transport level
 
-    
+        # Create distribution list for the project
+        $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
+        $dlOwner = "matt@huntertech.ca"  # Changed to be the owner
+        $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
+        
+        $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember
+        if ($distributionList) {
+            # Enable external email reception
+            Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+            Write-Host "Successfully created/updated distribution list for project $projectCode"
+        } else {
+            Write-Host "Failed to create/update distribution list for project $projectCode"
+        }
+    }
+    #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
+    #create the mailbox rule to move the item to the correct folder
+    #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
+    #allow external email reception for the distribution list
 }
 
 # Timer trigger to run the function periodically

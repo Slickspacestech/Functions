@@ -45,19 +45,29 @@ function Send-Email {
 
 function getBlueBeamLatest {
     param($currentVersion)
-    write-host "latest in vault is $latest"
+    write-host "latest in vault is $currentVersion"
     $url = "https://support.bluebeam.com/en-us/release-notes-all.html"
 
+    $webClient = New-Object System.Net.WebClient
+    $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
+        
+        # Download the HTML content
+    $htmlContent = $webClient.DownloadString($url)
     # Load the HTML content from the URL
-    $html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing
-    $found = $html -match '<p>Revu.+?(?=<)'
+    $pattern = '<p[^>]*>(?:(?!</p>).)*?Revu\s+(\d{2}\.\d\.\d)[^<]*'
+        
+    # Find all matches
+    $found= [regex]::Matches($htmlContent, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
+    
+   
     if ($found) {
-        $firstLiItem = ([string]$Matches.Values).Replace("<p>Revu ", "")
+        $firstLiItem = ([string]$found[0].Value).Replace("<p>Revu ", "")
         return $firstLiItem
     }else{
         return $null
     }
 }
+
 
 function getAutodeskLatest {
     param(
