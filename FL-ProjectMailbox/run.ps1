@@ -178,43 +178,6 @@ function safe_create_distribution_list {
     }
 }
 
-function Get-RevuVersion {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$Url
-    )
-
-    try {
-        # Create a web client to handle the request
-        $webClient = New-Object System.Net.WebClient
-        $webClient.Headers.Add("User-Agent", "Mozilla/5.0")
-        
-        # Download the HTML content
-        $htmlContent = $webClient.DownloadString($Url)
-        
-        # Create a regex pattern to match content within p tags that contains "Revu" followed by version number
-        $pattern = '<p[^>]*>(?:(?!</p>).)*?Revu\s+(\d{2}\.\d\.\d)[^<]*</p>'
-        
-        # Find all matches
-        $matches = [regex]::Matches($htmlContent, $pattern, [System.Text.RegularExpressions.RegexOptions]::IgnoreCase)
-        
-        if ($matches.Count -gt 0) {
-            foreach ($match in $matches) {
-                # Extract just the version number from the match
-                $versionNumber = $match.Groups[1].Value
-                Write-Host "Found Revu version: $versionNumber"
-                return $versionNumber
-            }
-        } else {
-            Write-Host "No Revu version in format ##.#.# found in the specified URL"
-            return $null
-        }
-    }
-    catch {
-        Write-Error "Error parsing URL: $_"
-        return $null
-    }
-}
 
 # Main function to be triggered by the Azure Function
 function RunFunction {
