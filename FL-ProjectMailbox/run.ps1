@@ -14,10 +14,10 @@ if ($Timer.IsPastDue) {
 # Write an information log with the current time.
 Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
 # Import the required modules 
-Import-Module Az.Accounts
-Import-Module Microsoft.Graph
-Import-Module ImportExcel
-Import-Module PnP.PowerShell
+# Import-Module Az.Accounts
+# Import-Module Microsoft.Graph
+# Import-Module ImportExcel
+# Import-Module PnP.PowerShell
 
 <#
 Import-Module Az.Accounts
