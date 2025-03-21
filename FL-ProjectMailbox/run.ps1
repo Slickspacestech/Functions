@@ -234,7 +234,4 @@ function RunFunction {
 # Timer trigger to run the function periodically
 $Timer = $null
 $vaultName = "huntertechvault"
-$latest = Get-AzKeyVaultSecret -VaultName $vaultName -Name "BBversion" -AsPlainText
 RunFunction -Timer $Timer
-write-host "why!"
-write-host $latest
