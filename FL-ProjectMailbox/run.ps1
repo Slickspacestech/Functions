@@ -182,13 +182,13 @@ function safe_create_distribution_list {
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
-
+    import-module Az.Accounts
     Connect-AzAccount -Identity
 
     # Retrieve the secure password from Azure Key Vault
     $vaultName = "huntertechvault"
     $certName = "fl-mailbox"
-    import-module Az.Accounts
+    
     $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $certName -AsPlainText
     $privatebytes = [system.convert]::FromBase64String($certsecret)
     $cert = new-object System.security.cryptography.x509certificates.x509certificate2(,$privatebytes)
