@@ -179,10 +179,11 @@ function safe_create_distribution_list {
 }
 
 
+
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
-    import-module Az.Accounts
+    # import-module Az.Accounts
     Connect-AzAccount -Identity
 
     # Retrieve the secure password from Azure Key Vault
