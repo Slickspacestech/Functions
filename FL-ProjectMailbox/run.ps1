@@ -189,10 +189,13 @@ function RunFunction {
     # Retrieve the secure password from Azure Key Vault
     $vaultName = "huntertechvault"
     $certName = "fl-mailbox"
-    
-    $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $certName -AsPlainText
-    $privatebytes = [system.convert]::FromBase64String($certsecret)
-    $cert = new-object System.security.cryptography.x509certificates.x509certificate2(,$privatebytes)
+    $cert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName
+    $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name -AsPlainText
+    $privateCert = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name
+    $pfxBytes = [Convert]::FromBase64String($privateCert.SecretValueText) 
+    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
+    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, "", $flags)
+
     $vTenantid = "tenantid"
     $vAppid = "appid"
     $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vTenantid -AsPlainText
