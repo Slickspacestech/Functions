@@ -192,6 +192,9 @@ function RunFunction {
     $cert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName
     $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name -AsPlainText
     $privatebytes = [system.convert]::FromBase64String($certsecret)
+    if ($privatebytes -eq $null -or $privatebytes.Length -eq 0) {
+        throw "The certificate data is empty or null."
+    }
     $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
     $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($privatebytes, "", $flags)
     $vTenantid = "tenantid"
