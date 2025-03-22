@@ -191,11 +191,9 @@ function RunFunction {
     $certName = "fl-mailbox"
     $cert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName
     $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name -AsPlainText
-    $privateCert = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name
     $pfxBytes = [Convert]::FromBase64String($privateCert.SecretValueText) 
     $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
     $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($pfxBytes, "", $flags)
-
     $vTenantid = "tenantid"
     $vAppid = "appid"
     $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vTenantid -AsPlainText
