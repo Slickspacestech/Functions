@@ -5,10 +5,6 @@
     'Az.Functions' = '4.*'
     'Az.KeyVault' = '6.*'
     'ImportExcel' = '7.*'
-    'Microsoft.Graph.Authentication' = '2.*'
-    'Microsoft.Graph.Users' = '2.*'
-    'Microsoft.Graph.Groups' = '2.*'
-    'Microsoft.Graph.Mail' = '2.*'
     'ExchangeOnlineManagement'= '3.*'
     'PnP.PowerShell' = '2.*'
 }
