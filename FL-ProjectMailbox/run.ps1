@@ -51,79 +51,79 @@ function Send-Email {
 }
 
 
-function create_mailboxfolder(){
-    param(
-        $identity,
-        $folder
-    )
-    $params = @{
-        displayName = "$folder"
-        isHidden = $false
-       }
-    $folder = New-MgUserMailFolder -UserId $identity -BodyParameter $params
-    return $folder
-}
-function safe_create_folder(){
-    param($name)
-    $folder = get-mguserMailFolder -UserId projects@firstlightenergy.ca | Where {$_.displayName -eq "$name"}
-    if (!($folder)){
-        $folder = create_mailboxfolder "projects@firstlightenergy.ca" $name
-    }
-    return $folder
-}
+# function create_mailboxfolder(){
+#     param(
+#         $identity,
+#         $folder
+#     )
+#     $params = @{
+#         displayName = "$folder"
+#         isHidden = $false
+#        }
+#     $folder = New-MgUserMailFolder -UserId $identity -BodyParameter $params
+#     return $folder
+# }
+# function safe_create_folder(){
+#     param($name)
+#     $folder = get-mguserMailFolder -UserId projects@firstlightenergy.ca | Where {$_.displayName -eq "$name"}
+#     if (!($folder)){
+#         $folder = create_mailboxfolder "projects@firstlightenergy.ca" $name
+#     }
+#     return $folder
+# }
 
-function create_rule(){
-    param(
-        $sequence,
-        $folderid,
-        $displayName,
-        $project_string,
-        $userid
-    )
-    $rule = @{
-        displayName = $displayName
-        sequence = $sequence
-        isEnabled = $true
-        conditions = @{
-            subjectContains = @(
-                $project_string
-            )
-        }
-        actions = @{
-            moveToFolder = $folderid
-        }
-    }
-    $new_rule = New-MgUserMailFolderMessageRule -UserId $userid -BodyParameter $rule -MailFolderId $folderid
-    return $new_rule
-}
+# function create_rule(){
+#     param(
+#         $sequence,
+#         $folderid,
+#         $displayName,
+#         $project_string,
+#         $userid
+#     )
+#     $rule = @{
+#         displayName = $displayName
+#         sequence = $sequence
+#         isEnabled = $true
+#         conditions = @{
+#             subjectContains = @(
+#                 $project_string
+#             )
+#         }
+#         actions = @{
+#             moveToFolder = $folderid
+#         }
+#     }
+#     $new_rule = New-MgUserMailFolderMessageRule -UserId $userid -BodyParameter $rule -MailFolderId $folderid
+#     return $new_rule
+# }
 
-function safe_create_rule(){
-    param(
-        $folderid,
-        $matchstring,
-        $userid
-    )
-    $projectRule = $null
-    $rules = Get-MgUserMailFolderMessageRule -MailFolderId inbox -UserId $userid
-    if ($rules){
-        $nextSequence = ($rules | Sort-Object -Property Sequence -Descending | select sequence -First 1).sequence + 1
-    }else{
-        $nextSequence = 1
-    }
+# function safe_create_rule(){
+#     param(
+#         $folderid,
+#         $matchstring,
+#         $userid
+#     )
+#     $projectRule = $null
+#     $rules = Get-MgUserMailFolderMessageRule -MailFolderId inbox -UserId $userid
+#     if ($rules){
+#         $nextSequence = ($rules | Sort-Object -Property Sequence -Descending | select sequence -First 1).sequence + 1
+#     }else{
+#         $nextSequence = 1
+#     }
     
-    $exists = $false
-    foreach ($rule in $rules){
-        if ($rule.Conditions.SubjectContains -eq $matchstring){
-            $exists = $true
-            $projectRule = $rule
-            break
-        }
-    }
-    if (-not ($exists)){
-        $projectRule = create_rule $nextSequence $folderid $matchstring $matchstring $userid
-    }
-    return $projectRule
-}
+#     $exists = $false
+#     foreach ($rule in $rules){
+#         if ($rule.Conditions.SubjectContains -eq $matchstring){
+#             $exists = $true
+#             $projectRule = $rule
+#             break
+#         }
+#     }
+#     if (-not ($exists)){
+#         $projectRule = create_rule $nextSequence $folderid $matchstring $matchstring $userid
+#     }
+#     return $projectRule
+# }
 
 function safe_create_distribution_list {
     param(
@@ -217,7 +217,7 @@ function RunFunction {
         $projectName = $project.'Project Name'.trim()
         
         $name = "$projectCode-$projectName"
-        $folder = safe_create_folder $name
+        # $folder = safe_create_folder $name
 
         # Create distribution list for the project
         $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
@@ -232,7 +232,12 @@ function RunFunction {
         } else {
             Write-Host "Failed to create/update distribution list for project $projectCode"
         }
+        # Write the distribution list status back to Excel
+        Write-ExcelValue -Path "D:\local\projects.xlsx" -Value ($distributionList -ne $null) -Column "C" -Row ($projects.IndexOf($project) + 2) -force
+    
     }
+    # Upload the updated Excel file back to SharePoint
+    Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx" -Force
     #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
     #create the mailbox rule to move the item to the correct folder
     #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
