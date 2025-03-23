@@ -129,6 +129,9 @@ function safe_create_distribution_list {
     param(
         [Parameter(Mandatory=$true)]
         [string]$DisplayName,
+
+        [Parameter(Mandatory=$true)]
+        [string]$ProjectCode,
         
         [Parameter(Mandatory=$true)]
         [string]$OwnerEmail,
@@ -205,7 +208,7 @@ function RunFunction {
     $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
     Connect-MgGraph -TenantId $tenantid -appid $appid -certificate $cert
     connect-pnponline -url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
-    Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile
+    Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
     $projects = import-excel -Path D:\local\projects.xlsx
     $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
     
@@ -221,7 +224,7 @@ function RunFunction {
         $dlOwner = "matt@huntertech.ca"  # Changed to be the owner
         $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
         
-        $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember
+        $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
         if ($distributionList) {
             # Enable external email reception
             Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
