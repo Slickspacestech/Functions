@@ -193,7 +193,7 @@ function RunFunction {
     $vaultName = "huntertechvault"
     $certName = "fl-mailbox"
     $cert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName
-    $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $cert.Name -AsPlainText
+    $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $certName -AsPlainText
     $privatebytes = [system.convert]::FromBase64String($certsecret)
     if ($privatebytes -eq $null -or $privatebytes.Length -eq 0) {
         throw "The certificate data is empty or null."
@@ -206,7 +206,6 @@ function RunFunction {
     $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vAppid -AsPlainText
     $session = Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
     $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
-    Connect-MgGraph -TenantId $tenantid -appid $appid -certificate $cert
     connect-pnponline -url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
     Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
     $projects = import-excel -Path D:\local\projects.xlsx
