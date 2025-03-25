@@ -7,4 +7,5 @@
     'ImportExcel' = '7.8.10'
     'ExchangeOnlineManagement'= '3.4.0'
     'PnP.PowerShell' = '2.12.0'
+    'Microsoft.Identity.Client' = '4.64.0'
 }
