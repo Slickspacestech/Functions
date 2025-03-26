@@ -4,8 +4,9 @@
     'Az.Accounts' = '4.0.0'
     'Az.Functions' = '4.*'
     'Az.KeyVault' = '6.3.0'
-#     'ImportExcel' = '7.8.10'
+#     
     'PnP.PowerShell' = '2.12.0'
+    'ImportExcel' = '7.8.10'
 #     'ExchangeOnlineManagement'= '3.4.0'
 }
 
