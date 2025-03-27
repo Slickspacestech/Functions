@@ -166,7 +166,7 @@ function safe_create_distribution_list {
         }
 
         # Create the distribution list
-        $newGroup = New-DistributionGroup -Name $DisplayName -DisplayName $DisplayName -ManagedBy $OwnerEmail -PrimarySmtpAddress "$DisplayName@firstlightenergy.ca"
+        $newGroup = New-DistributionGroup -Name $DisplayName -DisplayName $DisplayName -ManagedBy $OwnerEmail -PrimarySmtpAddress "$ProjectCode@firstlightenergy.ca"
         Write-Host "Created new distribution list '$DisplayName'"
 
         # Add member
