@@ -204,12 +204,16 @@ function RunFunction {
     $vAppid = "appid"
     $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vTenantid -AsPlainText
     $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vAppid -AsPlainText
-    # $session = Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
+    Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
+    $projectsmb = Get-Mailbox -Identity "projects@firstlightenergy.ca"
+    Write-Information "connected to exchange, projectsmb is $($projectsmb.Name)"
     $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
     connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
-    # Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
-    # $projects = import-excel -Path D:\local\projects.xlsx
-    # $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
+    $web = Get-PnPWeb
+    Write-Information "connected to sharepoint, url is $($web.Url)"
+    Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
+    $projects = import-excel -Path D:\local\projects.xlsx
+    $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
     
     # foreach ($project in $projects){
     #     $projectCode = $project.'Project #'.trim()
