@@ -204,7 +204,7 @@ function RunFunction {
     $vAppid = "appid"
     $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vTenantid -AsPlainText
     $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vAppid -AsPlainText
-    $session = Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
+    # $session = Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
     $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
     connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
     # Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
