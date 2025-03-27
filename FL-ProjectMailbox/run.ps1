@@ -65,9 +65,9 @@ function safe_create_distribution_list {
             
             # Check if owner needs to be added
             $currentOwners = Get-DistributionGroup -Identity $DisplayName | Select-Object -ExpandProperty ManagedBy
-            if ($currentOwners -notcontains $OwnerEmail) {
+            if ( $OwnerEmail.Substring(0,$OwnerEmail.IndexOf("@")) -eq $currentOwners) {
                 Add-DistributionGroupMember -Identity $DisplayName -Member $OwnerEmail -BypassSecurityGroupManagerCheck
-                Set-DistributionGroup -Identity $DisplayName -ManagedBy $OwnerEmail
+                Set-DistributionGroup -Identity $DisplayName -ManagedBy $OwnerEmail -RequireSenderAuthenticationEnabled $false
                 Write-Host "Added owner: $OwnerEmail"
             }
             
@@ -147,7 +147,10 @@ function RunFunction {
         if ($distributionList) {
             write-information "distribution list created for $dlName"
             # Enable external email reception
-            Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+            $requireSenderAuthenticationEnabled = get-distributiongroup $dlName | select-object -expandproperty requireSenderAuthenticationEnabled
+            if ($requireSenderAuthenticationEnabled -eq $true){
+                Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+            }
             Write-Information "Successfully created/updated distribution list for project $projectCode"
         } else {
             Write-Information "Failed to create/update distribution list for project $projectCode"
@@ -165,7 +168,7 @@ function RunFunction {
     # # Upload the updated Excel file back to SharePoint
     write-information "uploading projects.xlsx to sharepoint"
    
-    Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx" -Force
+    Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx"
     #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
     #create the mailbox rule to move the item to the correct folder
     #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
