@@ -215,36 +215,38 @@ function RunFunction {
     $projects = import-excel -Path D:\local\projects.xlsx
     $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
     
-    # foreach ($project in $projects){
-    #     $projectCode = $project.'Project #'.trim()
-    #     $projectName = $project.'Project Name'.trim()
+    foreach ($project in $projects){
+        $projectCode = $project.'Project #'.trim()
+        $projectName = $project.'Project Name'.trim()
         
-    #     $name = "$projectCode-$projectName"
-    #     # $folder = safe_create_folder $name
+        $name = "$projectCode-$projectName"
+        # $folder = safe_create_folder $name
 
-    #     # Create distribution list for the project
-    #     $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
-    #     $dlOwner = "matt@huntertech.ca"  # Changed to be the owner
-    #     $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
-        
-    #     $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
-    #     if ($distributionList) {
-    #         # Enable external email reception
-    #         Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
-    #         Write-Host "Successfully created/updated distribution list for project $projectCode"
-    #     } else {
-    #         Write-Host "Failed to create/update distribution list for project $projectCode"
-    #     }
-    #     # Write the distribution list status back to Excel
-    #     Write-ExcelValue -Path "D:\local\projects.xlsx" -Value ($distributionList -ne $null) -Column "C" -Row ($projects.IndexOf($project) + 2) -force
+        # Create distribution list for the project
+        $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
+        $dlOwner = "matt@huntertech.ca"  # Changed to be the owner
+        $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
+        write-information "creating distribution list for $dlName"
+        $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
+        if ($distributionList) {
+            write-information "distribution list created for $dlName"
+            # Enable external email reception
+            Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+            Write-Information "Successfully created/updated distribution list for project $projectCode"
+        } else {
+            Write-Information "Failed to create/update distribution list for project $projectCode"
+        }
+        # Write the distribution list status back to Excel
+        Write-ExcelValue -Path "D:\local\projects.xlsx" -Value ($distributionList -ne $null) -Column "C" -Row ($projects.IndexOf($project) + 2) -force
     
-    # }
+    }
     # # Upload the updated Excel file back to SharePoint
-    # Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx" -Force
-    # #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
-    # #create the mailbox rule to move the item to the correct folder
-    # #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
-    # #allow external email reception for the distribution list
+    write-information "uploading projects.xlsx to sharepoint"
+    Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx" -Force
+    #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
+    #create the mailbox rule to move the item to the correct folder
+    #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
+    #allow external email reception for the distribution list
 }
 
 # Timer trigger to run the function periodically
