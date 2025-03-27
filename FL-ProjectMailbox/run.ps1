@@ -13,17 +13,6 @@ if ($Timer.IsPastDue) {
 
 # Write an information log with the current time.
 Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
-# Import the required modules 
-# Import-Module Az.Accounts
-# Import-Module Microsoft.Graph
-# Import-Module ImportExcel
-# Import-Module PnP.PowerShell
-
-<#
-Import-Module Az.Accounts
-Import-Module Az.Functions
-Install-Module -Name Az.KeyVault -Force -Scope CurrentUser
-#>
 
 
 
@@ -51,79 +40,6 @@ function Send-Email {
 }
 
 
-# function create_mailboxfolder(){
-#     param(
-#         $identity,
-#         $folder
-#     )
-#     $params = @{
-#         displayName = "$folder"
-#         isHidden = $false
-#        }
-#     $folder = New-MgUserMailFolder -UserId $identity -BodyParameter $params
-#     return $folder
-# }
-# function safe_create_folder(){
-#     param($name)
-#     $folder = get-mguserMailFolder -UserId projects@firstlightenergy.ca | Where {$_.displayName -eq "$name"}
-#     if (!($folder)){
-#         $folder = create_mailboxfolder "projects@firstlightenergy.ca" $name
-#     }
-#     return $folder
-# }
-
-# function create_rule(){
-#     param(
-#         $sequence,
-#         $folderid,
-#         $displayName,
-#         $project_string,
-#         $userid
-#     )
-#     $rule = @{
-#         displayName = $displayName
-#         sequence = $sequence
-#         isEnabled = $true
-#         conditions = @{
-#             subjectContains = @(
-#                 $project_string
-#             )
-#         }
-#         actions = @{
-#             moveToFolder = $folderid
-#         }
-#     }
-#     $new_rule = New-MgUserMailFolderMessageRule -UserId $userid -BodyParameter $rule -MailFolderId $folderid
-#     return $new_rule
-# }
-
-# function safe_create_rule(){
-#     param(
-#         $folderid,
-#         $matchstring,
-#         $userid
-#     )
-#     $projectRule = $null
-#     $rules = Get-MgUserMailFolderMessageRule -MailFolderId inbox -UserId $userid
-#     if ($rules){
-#         $nextSequence = ($rules | Sort-Object -Property Sequence -Descending | select sequence -First 1).sequence + 1
-#     }else{
-#         $nextSequence = 1
-#     }
-    
-#     $exists = $false
-#     foreach ($rule in $rules){
-#         if ($rule.Conditions.SubjectContains -eq $matchstring){
-#             $exists = $true
-#             $projectRule = $rule
-#             break
-#         }
-#     }
-#     if (-not ($exists)){
-#         $projectRule = create_rule $nextSequence $folderid $matchstring $matchstring $userid
-#     }
-#     return $projectRule
-# }
 
 function safe_create_distribution_list {
     param(
@@ -224,7 +140,7 @@ function RunFunction {
 
         # Create distribution list for the project
         $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
-        $dlOwner = "matt@huntertech.ca"  # Changed to be the owner
+        $dlOwner = "plan8admin@firstlightenergy.ca"  # Changed to be the owner
         $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
         write-information "creating distribution list for $dlName"
         $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
