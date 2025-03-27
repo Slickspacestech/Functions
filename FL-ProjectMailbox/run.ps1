@@ -66,6 +66,7 @@ function safe_create_distribution_list {
             # Check if owner needs to be added
             $currentOwners = Get-DistributionGroup -Identity $DisplayName | Select-Object -ExpandProperty ManagedBy
             if ( $OwnerEmail.Substring(0,$OwnerEmail.IndexOf("@")) -eq $currentOwners) {
+                write-information "owner $OwnerEmail doesn't equal $currentOwners, skipping"
                 Add-DistributionGroupMember -Identity $DisplayName -Member $OwnerEmail -BypassSecurityGroupManagerCheck
                 Set-DistributionGroup -Identity $DisplayName -ManagedBy $OwnerEmail -RequireSenderAuthenticationEnabled $false
                 Write-Host "Added owner: $OwnerEmail"
@@ -73,9 +74,13 @@ function safe_create_distribution_list {
             
             # Check if member needs to be added
             $currentMembers = Get-DistributionGroupMember -Identity $DisplayName | Select-Object -ExpandProperty PrimarySmtpAddress
-            if ($currentMembers -notcontains $MemberEmail) {
-                Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
-                Write-Host "Added member: $MemberEmail"
+            foreach ($member in $currentMembers){
+                if ($member -eq $MemberEmail){
+                    write-information "member $MemberEmail already exists, skipping"
+                }else{
+                    Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
+                    Write-Host "Added member: $MemberEmail"
+                }
             }
             
             return $existingGroup
@@ -142,27 +147,31 @@ function RunFunction {
         $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
         $dlOwner = "plan8admin@firstlightenergy.ca"  # Changed to be the owner
         $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
-        write-information "creating distribution list for $dlName"
-        $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
-        if ($distributionList) {
-            write-information "distribution list created for $dlName"
-            # Enable external email reception
-            $requireSenderAuthenticationEnabled = get-distributiongroup $dlName | select-object -expandproperty requireSenderAuthenticationEnabled
-            if ($requireSenderAuthenticationEnabled -eq $true){
-                Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+
+        if (!$project.Created){
+            write-information "creating distribution list for $dlName"
+            $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
+            if ($distributionList) {
+                write-information "distribution list created for $dlName"
+                # Enable external email reception
+                $requireSenderAuthenticationEnabled = get-distributiongroup $dlName | select-object -expandproperty requireSenderAuthenticationEnabled
+                if ($requireSenderAuthenticationEnabled -eq $true){
+                    Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+                }
+                Write-Information "Successfully created/updated distribution list for project $projectCode"
+            } else {
+                Write-Information "Failed to create/update distribution list for project $projectCode"
             }
-            Write-Information "Successfully created/updated distribution list for project $projectCode"
-        } else {
-            Write-Information "Failed to create/update distribution list for project $projectCode"
+            # Update Excel with distribution list status
+            $excel = Open-ExcelPackage -Path "D:\local\projects.xlsx"
+            $worksheet = $excel.Workbook.Worksheets[1]  # Assuming first worksheet
+            $row = if ($projects.count -le 1) { 2 } else { $projects.IndexOf($project) + 2 }
+            $worksheet.Cells["C$row"].Value = ($distributionList -ne $null)
+            $excel.Save()
+            Close-ExcelPackage $excel
+        }else{
+            write-information "project $projectCode already exists, skipping"
         }
-        # Update Excel with distribution list status
-        $excel = Open-ExcelPackage -Path "D:\local\projects.xlsx"
-        $worksheet = $excel.Workbook.Worksheets[1]  # Assuming first worksheet
-        $row = if ($projects.count -le 1) { 2 } else { $projects.IndexOf($project) + 2 }
-        $worksheet.Cells["C$row"].Value = ($distributionList -ne $null)
-        $excel.Save()
-        Close-ExcelPackage $excel
-        
     
     }
     # # Upload the updated Excel file back to SharePoint
