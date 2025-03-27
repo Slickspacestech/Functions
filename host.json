@@ -1,6 +1,11 @@
 {
   "version": "2.0",
   "logging": {
+    "logLevel": {
+      "Function.FL-ProjectMailbox": "Debug",
+      "Host": "Debug",
+      "Microsoft": "Information"
+    },
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
@@ -13,6 +18,18 @@
     "version": "[4.*, 5.0.0)"
   },
   "managedDependency": {
-    "enabled": true
+    "enabled": false
+  }
+}
+,
+"powerShell": {
+  "managedDependencyPath": "Modules",
+  "dependencies": {
+    "Az.Accounts": "2.*",
+    "Az.KeyVault": "4.*",
+    "ExchangeOnlineManagement": "3.*",
+    "Microsoft.Graph.Authentication": "2.*",
+    "PnP.PowerShell": "2.*",
+    "ImportExcel": "7.*"
   }
 }
