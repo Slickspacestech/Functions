@@ -1,11 +1,6 @@
 {
   "version": "2.0",
   "logging": {
-    "logLevel": {
-      "Function.FL-ProjectMailbox": "Debug",
-      "Host": "Debug",
-      "Microsoft": "Information"
-    },
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
