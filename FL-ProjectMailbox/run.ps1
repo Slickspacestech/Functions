@@ -152,12 +152,19 @@ function RunFunction {
         } else {
             Write-Information "Failed to create/update distribution list for project $projectCode"
         }
-        # Write the distribution list status back to Excel
-        Write-ExcelValue -Path "D:\local\projects.xlsx" -Value ($distributionList -ne $null) -Column "C" -Row ($projects.IndexOf($project) + 2) -force
+        # Update Excel with distribution list status
+        $excel = Open-ExcelPackage -Path "D:\local\projects.xlsx"
+        $worksheet = $excel.Workbook.Worksheets[1]  # Assuming first worksheet
+        $row = if ($projects.count -le 1) { 2 } else { $projects.IndexOf($project) + 2 }
+        $worksheet.Cells["C$row"].Value = ($distributionList -ne $null)
+        $excel.Save()
+        Close-ExcelPackage $excel
+        
     
     }
     # # Upload the updated Excel file back to SharePoint
     write-information "uploading projects.xlsx to sharepoint"
+   
     Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx" -Force
     #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
     #create the mailbox rule to move the item to the correct folder
