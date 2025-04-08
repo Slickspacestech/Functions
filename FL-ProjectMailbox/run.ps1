@@ -21,7 +21,6 @@ import-module ImportExcel -Force
 Write-Host "v1.3 PowerShell timer trigger function ran! TIME: $currentUTCtime"
 $exchange = get-module ExchangeOnlineManagement
 $accounts = get-module Az.Accounts
-$functions = get-module Az.Functions
 $keyvault = get-module Az.KeyVault
 $pnp = get-module PnP.PowerShell
 $importexcel = get-module ImportExcel
@@ -30,7 +29,6 @@ $importexcel = get-module ImportExcel
 
 write-host "exchange: $($exchange.Version)"
 write-host "accounts: $($accounts.Version)"
-write-host "functions: $($functions.Version)"
 write-host "keyvault: $($keyvault.Version)"
 write-host "pnp: $($pnp.Version)"
 write-host "importexcel: $($importexcel.Version)"
