@@ -11,15 +11,14 @@ if ($Timer.IsPastDue) {
     Write-Host "PowerShell timer is running late!"
 }
 
-import-module ExchangeOnlineManagement
-import-module Az.Accounts
-import-module Az.Functions
-import-module Az.KeyVault
-import-module PnP.PowerShell
-import-module ImportExcel
+import-module ExchangeOnlineManagement -RequiredVersion 3.4.0 -Force
+import-module Az.Accounts -Force
+import-module Az.KeyVault -Force
+import-module PnP.PowerShell -Force
+import-module ImportExcel -Force
 
 # Write an information log with the current time.
-Write-Host "v1.2 PowerShell timer trigger function ran! TIME: $currentUTCtime"
+Write-Host "v1.3 PowerShell timer trigger function ran! TIME: $currentUTCtime"
 $exchange = get-module ExchangeOnlineManagement
 $accounts = get-module Az.Accounts
 $functions = get-module Az.Functions
