@@ -11,7 +11,7 @@ if ($Timer.IsPastDue) {
     Write-Host "PowerShell timer is running late!"
 }
 
-import-module ExchangeOnlineManagement -RequiredVersion 3.4.0 -Force
+import-module ExchangeOnlineManagement
 import-module Az.Accounts -Force
 import-module Az.KeyVault -Force
 import-module PnP.PowerShell -Force
