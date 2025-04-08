@@ -12,7 +12,7 @@ if ($Timer.IsPastDue) {
 }
 
 # Write an information log with the current time.
-Write-Host "PowerShell timer trigger function ran! TIME: $currentUTCtime"
+Write-Host "v1.1 PowerShell timer trigger function ran! TIME: $currentUTCtime"
 $exchange = get-module ExchangeOnlineManagement
 $accounts = get-module Az.Accounts
 $functions = get-module Az.Functions
