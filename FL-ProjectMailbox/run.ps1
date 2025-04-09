@@ -74,7 +74,7 @@ function Send-Email {
 function RunFunction {
     param($Timer)
     
-    try {
+    # try {
         Connect-AzAccount -Identity
 
         # Retrieve secrets from Azure Key Vault
@@ -147,17 +147,17 @@ function RunFunction {
         # Upload the updated Excel file back to SharePoint
         Write-Information "Uploading projects.xlsx to SharePoint"
         Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx"
-    }
-    catch {
-        Write-Error "Error in main function: $_"
-        Send-Email -subject "Project Processing Error" `
-                  -version "" `
-                  -securePassword $smtp2go `
-                  -body "Function failed with error: $_"
-    }
-    finally {
-        Clear-TempFiles
-    }
+    # }
+    # catch {
+        # Write-Error "Error in main function: $_"
+        # Send-Email -subject "Project Processing Error" `
+                #   -version "" `
+                #   -securePassword $smtp2go `
+                #   -body "Function failed with error: $_"
+    # }
+    # finally {
+         Clear-TempFiles
+    # }
 }
 
 # Timer trigger to run the function periodically
