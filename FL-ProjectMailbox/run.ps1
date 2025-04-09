@@ -89,7 +89,14 @@ function RunFunction {
         $web = Get-PnPWeb
         Write-Information "Connected to SharePoint, url is $($web.Url)"
         
-        Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
+        Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force -ErrorAction Stop
+        if (-not (Test-Path -Path "D:\Local\projects.xlsx")) {
+            Write-Error "Failed to download Project-List.xlsx from SharePoint"
+            Send-Email -subject "Project List Download Error" `
+                       -version "" `
+                       -securePassword $smtp2go `
+                       -body "Failed to download Project-List.xlsx from SharePoint"
+        }
         $projects = import-excel -Path D:\local\projects.xlsx
         
         foreach ($project in $projects){
