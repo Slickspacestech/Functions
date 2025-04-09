@@ -8,6 +8,12 @@ Import-Module ExchangeOnlineManagement
 Import-Module Az.Accounts -Force
 Import-Module Az.KeyVault -Force
 
+$exchangemodule = get-module ExchangeOnlineManagement
+
+
+write-host "exchange: $($exchangemodule.Version)"
+
+
 # Write version info
 Write-Host "FL-ExchangeManager v1.0"
 
