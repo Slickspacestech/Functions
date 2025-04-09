@@ -17,7 +17,7 @@ import-module PnP.PowerShell -Force
 import-module ImportExcel -Force
 
 # Write an information log with the current time.
-Write-Host "v1.5 PowerShell timer trigger function ran! TIME: $currentUTCtime"
+Write-Host "v1.6 PowerShell timer trigger function ran! TIME: $currentUTCtime"
 
 function Clear-TempFiles {
     try {
@@ -82,12 +82,13 @@ function RunFunction {
         $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "tenantid" -AsPlainText
         $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "appid" -AsPlainText
         $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name "fl-mailbox" -AsPlainText
+        
         $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
 
         # Connect to SharePoint and get project list
         connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
         $web = Get-PnPWeb
-        Write-Information "Connected to SharePoint, url is $($web.Url)"
+        Write-host "Connected to SharePoint, url is $($web.Url)"
         
         Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force -ErrorAction Stop
         if (-not (Test-Path -Path "D:\Local\projects.xlsx")) {
