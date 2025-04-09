@@ -6,39 +6,18 @@ param($Timer)
 # Get the current universal time in the default string format
 $currentUTCtime = (Get-Date).ToUniversalTime()
 
-# The 'IsPastDue' porperty is 'true' when the current function invocation is later than scheduled.
+# The 'IsPastDue' property is 'true' when the current function invocation is later than scheduled.
 if ($Timer.IsPastDue) {
     Write-Host "PowerShell timer is running late!"
 }
-
 
 import-module Az.Accounts -Force
 import-module Az.KeyVault -Force
 import-module PnP.PowerShell -Force
 import-module ImportExcel -Force
-import-module ExchangeOnlineManagement
 
 # Write an information log with the current time.
-Write-Host "v1.4 PowerShell timer trigger function ran! TIME: $currentUTCtime"
-
-$exchange = get-module ExchangeOnlineManagement
-$accounts = get-module Az.Accounts
-$keyvault = get-module Az.KeyVault
-$pnp = get-module PnP.PowerShell
-$importexcel = get-module ImportExcel
-
-
-
-write-host "exchange: $($exchange.Version)"
-write-host "accounts: $($accounts.Version)"
-write-host "keyvault: $($keyvault.Version)"
-write-host "pnp: $($pnp.Version)"
-write-host "importexcel: $($importexcel.Version)"
-
-
-
-
-
+Write-Host "v1.5 PowerShell timer trigger function ran! TIME: $currentUTCtime"
 
 function Clear-TempFiles {
     try {
@@ -50,7 +29,6 @@ function Clear-TempFiles {
             return
         }
 
-        # Get all files in temp directory (recursively)
         Get-ChildItem -Path $tempPath -File -Recurse -ErrorAction SilentlyContinue | 
             ForEach-Object {
                 try {
@@ -69,7 +47,7 @@ function Clear-TempFiles {
         Write-Warning "Error during temp cleanup: $_"
     }
 }
-# Define the function to send an email
+
 function Send-Email {
     param (
         [string]$subject,
@@ -92,154 +70,91 @@ function Send-Email {
     Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -Credential $credential -UseSsl
 }
 
-
-
-function safe_create_distribution_list {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$DisplayName,
-
-        [Parameter(Mandatory=$true)]
-        [string]$ProjectCode,
-        
-        [Parameter(Mandatory=$true)]
-        [string]$OwnerEmail,
-        
-        [Parameter(Mandatory=$true)]
-        [string]$MemberEmail
-    )
-
-    try {
-        # Check if the distribution list exists
-        $existingGroup = Get-DistributionGroup -Identity $DisplayName -ErrorAction SilentlyContinue
-        
-        if ($existingGroup) {
-            Write-Host "Distribution list '$DisplayName' already exists."
-            
-            # Check if owner needs to be added
-            $currentOwners = Get-DistributionGroup -Identity $DisplayName | Select-Object -ExpandProperty ManagedBy
-            if ( $OwnerEmail.Substring(0,$OwnerEmail.IndexOf("@")) -eq $currentOwners) {
-                write-information "owner $OwnerEmail doesn't equal $currentOwners, skipping"
-                Add-DistributionGroupMember -Identity $DisplayName -Member $OwnerEmail -BypassSecurityGroupManagerCheck
-                Set-DistributionGroup -Identity $DisplayName -ManagedBy $OwnerEmail -RequireSenderAuthenticationEnabled $false
-                Write-Host "Added owner: $OwnerEmail"
-            }
-            
-            # Check if member needs to be added
-            $currentMembers = Get-DistributionGroupMember -Identity $DisplayName | Select-Object -ExpandProperty PrimarySmtpAddress
-            foreach ($member in $currentMembers){
-                if ($member -eq $MemberEmail){
-                    write-information "member $MemberEmail already exists, skipping"
-                }else{
-                    Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
-                    Write-Host "Added member: $MemberEmail"
-                }
-            }
-            
-            return $existingGroup
-        }
-
-        # Create the distribution list
-        $newGroup = New-DistributionGroup -Name $DisplayName -DisplayName $DisplayName -ManagedBy $OwnerEmail -PrimarySmtpAddress "$ProjectCode@firstlightenergy.ca"
-        Write-Host "Created new distribution list '$DisplayName'"
-
-        # Add member
-        Add-DistributionGroupMember -Identity $DisplayName -Member $MemberEmail
-        Write-Host "Added member: $MemberEmail"
-
-        return $newGroup
-    }
-    catch {
-        Write-Error "Error creating distribution list: $_"
-        return $null
-    }
-}
-
-
-
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
-    # import-module Az.Accounts
-    Connect-AzAccount -Identity
-
-    # Retrieve the secure password from Azure Key Vault
-    $vaultName = "huntertechvault"
-    $certName = "fl-mailbox"
-    $cert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName
-    $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name $certName -AsPlainText
-    $privatebytes = [system.convert]::FromBase64String($certsecret)
-    if ($privatebytes -eq $null -or $privatebytes.Length -eq 0) {
-        throw "The certificate data is empty or null."
-    }
-    $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
-    $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($privatebytes, "", $flags)
-    $vTenantid = "tenantid"
-    $vAppid = "appid"
-    $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vTenantid -AsPlainText
-    $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name $vAppid -AsPlainText
-    Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
-    $projectsmb = Get-Mailbox -Identity "projects@firstlightenergy.ca"
-    Write-Information "connected to exchange, projectsmb is $($projectsmb.Name)"
-    $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
-    connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
-    $web = Get-PnPWeb
-    Write-Information "connected to sharepoint, url is $($web.Url)"
-    Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
-    $projects = import-excel -Path D:\local\projects.xlsx
-    $mailbox = Get-AzKeyVaultSecret -VaultName $vaultName -Name "flmailbox" -AsPlainText
     
-    foreach ($project in $projects){
-        $projectCode = $project.'Project #'.trim()
-        $projectName = $project.'Project Name'.trim()
+    try {
+        Connect-AzAccount -Identity
+
+        # Retrieve secrets from Azure Key Vault
+        $vaultName = "huntertechvault"
+        $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "tenantid" -AsPlainText
+        $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "appid" -AsPlainText
+        $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name "fl-mailbox" -AsPlainText
+        $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
+
+        # Connect to SharePoint and get project list
+        connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
+        $web = Get-PnPWeb
+        Write-Information "Connected to SharePoint, url is $($web.Url)"
         
-        $name = "$projectCode-$projectName"
-        # $folder = safe_create_folder $name
-
-        # Create distribution list for the project
-        $dlName = $name  # Using the full project name (ProjectCode-ProjectName)
-        $dlOwner = "plan8admin@firstlightenergy.ca"  # Changed to be the owner
-        $dlMember = "projects@firstlightenergy.ca"  # Changed to be the member
-
-        if (!$project.Created){
-            write-information "creating distribution list for $dlName"
-            $distributionList = safe_create_distribution_list -DisplayName $dlName -OwnerEmail $dlOwner -MemberEmail $dlMember -ProjectCode $projectCode
-            if ($distributionList) {
-                write-information "distribution list created for $dlName"
-                # Enable external email reception
-                $requireSenderAuthenticationEnabled = get-distributiongroup $dlName | select-object -expandproperty requireSenderAuthenticationEnabled
-                if ($requireSenderAuthenticationEnabled -eq $true){
-                    Set-DistributionGroup -Identity $dlName -RequireSenderAuthenticationEnabled $false
+        Get-PnPFile -Url "/sites/firstlightfiles/Shared Documents/General/Projects/Project-List.xlsx" -Path "D:\Local\" -Filename "projects.xlsx" -AsFile -force
+        $projects = import-excel -Path D:\local\projects.xlsx
+        
+        foreach ($project in $projects){
+            $projectCode = $project.'Project #'.trim()
+            $projectName = $project.'Project Name'.trim()
+            
+            if (!$project.Created){
+                Write-Information "Processing project: $projectCode"
+                
+                # Call Exchange Manager Function
+                $body = @{
+                    projectCode = $projectCode
+                    projectName = $projectName
                 }
-                Write-Information "Successfully created/updated distribution list for project $projectCode"
+                
+                try {
+                    $result = Invoke-RestMethod `
+                        -Uri "https://htupdatechecker2.azurewebsites.net/api/FL-ExchangeManager" `
+                        -Method Post `
+                        -Body ($body | ConvertTo-Json) `
+                        -ContentType "application/json" `
+                        -Headers @{
+                            "x-functions-key" = Get-AzKeyVaultSecret -VaultName $vaultName -Name "exchange-function-key" -AsPlainText
+                        }
+
+                    Write-Information "Exchange Manager result: $($result | ConvertTo-Json)"
+                    
+                    # Update Excel with distribution list status
+                    $excel = Open-ExcelPackage -Path "D:\local\projects.xlsx"
+                    $worksheet = $excel.Workbook.Worksheets[1]
+                    $row = if ($projects.count -le 1) { 2 } else { $projects.IndexOf($project) + 2 }
+                    $worksheet.Cells["C$row"].Value = $result.success
+                    $excel.Save()
+                    Close-ExcelPackage $excel
+                }
+                catch {
+                    Write-Error "Failed to process project $projectCode with Exchange Manager: $_"
+                    Send-Email -subject "Project Processing Error" `
+                             -version "" `
+                             -securePassword $smtp2go `
+                             -body "Failed to process project $projectCode. Error: $_"
+                }
             } else {
-                Write-Information "Failed to create/update distribution list for project $projectCode"
+                Write-Information "Project $projectCode already exists, skipping"
             }
-            # Update Excel with distribution list status
-            $excel = Open-ExcelPackage -Path "D:\local\projects.xlsx"
-            $worksheet = $excel.Workbook.Worksheets[1]  # Assuming first worksheet
-            $row = if ($projects.count -le 1) { 2 } else { $projects.IndexOf($project) + 2 }
-            $worksheet.Cells["C$row"].Value = ($distributionList -ne $null)
-            $excel.Save()
-            Close-ExcelPackage $excel
-        }else{
-            write-information "project $projectCode already exists, skipping"
         }
-    
+        
+        # Upload the updated Excel file back to SharePoint
+        Write-Information "Uploading projects.xlsx to SharePoint"
+        Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx"
     }
-    # # Upload the updated Excel file back to SharePoint
-    write-information "uploading projects.xlsx to sharepoint"
-   
-    Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx"
-    #goal is to read the csv or xlsx, connect to graph, check for/create a folder in the shared mailbox for each item in the xlsx
-    #create the mailbox rule to move the item to the correct folder
-    #create a distribution list for the project with the owner as matt@huntertech.ca and the member as projects@firstlightenergy.ca
-    #allow external email reception for the distribution list
+    catch {
+        Write-Error "Error in main function: $_"
+        Send-Email -subject "Project Processing Error" `
+                  -version "" `
+                  -securePassword $smtp2go `
+                  -body "Function failed with error: $_"
+    }
+    finally {
+        Clear-TempFiles
+    }
 }
 
 # Timer trigger to run the function periodically
 $Timer = $null
 $vaultName = "huntertechvault"
-Clear-TempFiles
 RunFunction -Timer $Timer
 
