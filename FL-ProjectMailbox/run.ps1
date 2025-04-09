@@ -1,6 +1,5 @@
 # Input bindings are passed in via param block.
-using namespace System.Net
-using namespace System.Security.Cryptography.X509Certificates
+
 param($Timer)
 
 # Get the current universal time in the default string format
@@ -148,6 +147,9 @@ function RunFunction {
         # Upload the updated Excel file back to SharePoint
         Write-Information "Uploading projects.xlsx to SharePoint"
         Add-PnPFile -Path "D:\local\projects.xlsx" -Folder "Shared Documents/General/Projects" -NewFileName "Project-List.xlsx"
+        remove-item -path "D:\local\projects.xlsx" -force
+        disconnect-pnponline
+        disconnect-azaccount
     # }
     # catch {
         # Write-Error "Error in main function: $_"
@@ -157,7 +159,7 @@ function RunFunction {
                 #   -body "Function failed with error: $_"
     # }
     # finally {
-         Clear-TempFiles
+         #Clear-TempFiles
     # }
 }
 
