@@ -18,7 +18,8 @@ import-module PnP.PowerShell -Force
 import-module ImportExcel -Force
 
 # Write an information log with the current time.
-Write-Host "v1.3 PowerShell timer trigger function ran! TIME: $currentUTCtime"
+Write-Host "v1.4 PowerShell timer trigger function ran! TIME: $currentUTCtime"
+
 $exchange = get-module ExchangeOnlineManagement
 $accounts = get-module Az.Accounts
 $keyvault = get-module Az.KeyVault
@@ -38,7 +39,35 @@ write-host "importexcel: $($importexcel.Version)"
 
 
 
+function Clear-TempFiles {
+    try {
+        Write-Information "Starting temp file cleanup..."
+        $tempPath = $env:TEMP
+        
+        if (-not (Test-Path -Path $tempPath)) {
+            Write-Warning "Temp directory not found at: $tempPath"
+            return
+        }
 
+        # Get all files in temp directory (recursively)
+        Get-ChildItem -Path $tempPath -File -Recurse -ErrorAction SilentlyContinue | 
+            ForEach-Object {
+                try {
+                    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                    Write-Debug "Deleted: $($_.FullName)"
+                }
+                catch {
+                    Write-Debug "Could not delete: $($_.FullName)"
+                    continue
+                }
+            }
+        
+        Write-Information "Temp file cleanup completed"
+    }
+    catch {
+        Write-Warning "Error during temp cleanup: $_"
+    }
+}
 # Define the function to send an email
 function Send-Email {
     param (
@@ -210,4 +239,6 @@ function RunFunction {
 # Timer trigger to run the function periodically
 $Timer = $null
 $vaultName = "huntertechvault"
+Clear-TempFiles
 RunFunction -Timer $Timer
+
