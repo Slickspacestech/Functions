@@ -80,12 +80,14 @@ function RunFunction {
         $vaultName = "huntertechvault"
         $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "tenantid" -AsPlainText
         $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "appid" -AsPlainText
-        $certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name "fl-mailbox" -AsPlainText
+        $thumbprint = "F87409186E7544C2D93B79931987BF2BE313E336"
+
+        #$certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name "fl-mailbox" -AsPlainText
         
         $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
 
         # Connect to SharePoint and get project list
-        connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -CertificateBase64Encoded $certsecret
+        connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -Thumbprint $thumbprint
         $web = Get-PnPWeb
         Write-host "Connected to SharePoint, url is $($web.Url)"
         
