@@ -4,7 +4,7 @@ using namespace System.Security.Cryptography.X509Certificates
 param($Request, $TriggerMetadata)
 
 # Import required modules
-Import-Module ExchangeOnlineManagement -RequiredVersion 3.5.0 -Force
+Import-Module ExchangeOnlineManagement -RequiredVersion 3.4.0 -Force
 Import-Module Az.Accounts -Force
 Import-Module Az.KeyVault -Force
 
@@ -15,7 +15,7 @@ write-host "exchange: $($exchangemodule.Version)"
 
 
 # Write version info
-Write-Host "FL-ExchangeManager v1.0"
+Write-Host "FL-ExchangeManager v1.1"
 
 function Connect-ExchangeServices {
     param(
