@@ -4,7 +4,7 @@ using namespace System.Security.Cryptography.X509Certificates
 param($Request, $TriggerMetadata)
 
 # Import required modules
-Import-Module ExchangeOnlineManagement
+Import-Module ExchangeOnlineManagement -RequiredVersion 3.5.0 -Force
 Import-Module Az.Accounts -Force
 Import-Module Az.KeyVault -Force
 
