@@ -152,6 +152,10 @@ function RunFunction {
         },
         @{
             "product" = "RVT"
+            "year" = "2026"
+        },
+        @{
+            "product" = "RVT"
             "year" = "2023"
         },
         @{
