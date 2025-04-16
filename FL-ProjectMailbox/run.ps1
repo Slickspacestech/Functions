@@ -84,7 +84,7 @@ function Test-CertificateExpiry {
 
     try {
         # Get certificate from the store
-        $cert = Get-ChildItem -Path "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction Stop
+        $cert = Get-ChildItem -Path "Cert:\LocalMachine" -Recurse | where { $_.Thumbprint -eq $Thumbprint }
         if (-not $cert) {
             throw "Certificate with thumbprint $Thumbprint not found"
         }
