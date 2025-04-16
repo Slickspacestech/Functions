@@ -27,24 +27,15 @@ function Connect-ExchangeServices {
         Connect-AzAccount -Identity
 
         # Get certificate and credentials
-        $certName = "fl-mailbox"
-        $cert = Get-AzKeyVaultCertificate -VaultName $VaultName -Name $certName
-        $certsecret = Get-AzKeyVaultSecret -VaultName $VaultName -Name $certName -AsPlainText
-        $privatebytes = [system.convert]::FromBase64String($certsecret)
-        
-        if ($null -eq $privatebytes -or $privatebytes.Length -eq 0) {
-            throw "Certificate data is empty or null."
-        }
-        
-        $flags = [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet
-        $cert = [System.Security.Cryptography.X509Certificates.X509Certificate2]::new($privatebytes, "", $flags)
+        $certthumb = "F87409186E7544C2D93B79931987BF2BE313E336"
+
         
         # Get tenant and app IDs
         $tenantid = Get-AzKeyVaultSecret -VaultName $VaultName -Name "tenantid" -AsPlainText
         $appid = Get-AzKeyVaultSecret -VaultName $VaultName -Name "appid" -AsPlainText
-        
+
         # Connect to Exchange Online
-        Connect-ExchangeOnline -Certificate $cert -AppId $appid -Organization "firstlightca.onmicrosoft.com"
+        Connect-ExchangeOnline -CertificateThumbprint $certthumb -AppId $appid -Organization "firstlightca.onmicrosoft.com"
         Write-Information "Successfully connected to Exchange Online"
         
         return $true

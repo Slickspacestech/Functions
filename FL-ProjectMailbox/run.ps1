@@ -14,6 +14,7 @@ import-module Az.Accounts -Force
 import-module Az.KeyVault -Force
 import-module PnP.PowerShell -Force
 import-module ImportExcel -Force
+import-module Az.Storage -Force
 
 # Write an information log with the current time.
 Write-Host "v1.6 PowerShell timer trigger function ran! TIME: $currentUTCtime"
@@ -69,11 +70,110 @@ function Send-Email {
     Send-MailMessage -From $from -To $to -Subject $subject -Body $body -SmtpServer $smtpServer -Port $smtpPort -Credential $credential -UseSsl
 }
 
+function Test-CertificateExpiry {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$Thumbprint,
+        
+        [Parameter(Mandatory=$true)]
+        [System.Security.SecureString]$SmtpPassword,
+        
+        [Parameter(Mandatory=$false)]
+        [int]$WarningDays = 30
+    )
+
+    try {
+        # Get certificate from the store
+        $cert = Get-ChildItem -Path "Cert:\LocalMachine\My\$Thumbprint" -ErrorAction Stop
+        if (-not $cert) {
+            throw "Certificate with thumbprint $Thumbprint not found"
+        }
+
+        # Calculate days until expiry
+        $daysUntilExpiry = ($cert.NotAfter - (Get-Date)).Days
+        
+        # Create email body with certificate details
+        $emailBody = @"
+Certificate Details:
+-------------------
+Subject: $($cert.Subject)
+Thumbprint: $($cert.Thumbprint)
+Expiry Date: $($cert.NotAfter)
+Days Remaining: $daysUntilExpiry
+
+Please ensure the certificate is renewed before expiration.
+"@
+
+        # Check if warning needed and not already sent today
+        if ($daysUntilExpiry -le $WarningDays) {
+            # Connect to Azure Storage
+            $storageAccount = Get-AzStorageAccount -ResourceGroupName "htupdatechecker" -Name "htupdatechecker"
+            $ctx = $storageAccount.Context
+            
+            # Create table if it doesn't exist
+            $tableName = "CertificateWarnings"
+            $table = Get-AzStorageTable -Name $tableName -Context $ctx -ErrorAction SilentlyContinue
+            if (-not $table) {
+                $table = New-AzStorageTable -Name $tableName -Context $ctx
+            }
+            
+            # Check last warning date
+            $lastWarning = Get-AzTableRow -Table $table.CloudTable -PartitionKey "Certificates" -RowKey $Thumbprint -ErrorAction SilentlyContinue
+            $today = (Get-Date).Date
+            
+            if (-not $lastWarning -or ([DateTime]$lastWarning.LastWarningDate).Date -lt $today) {
+                # Send warning email
+                Send-Email `
+                    -subject "Certificate Expiry Warning - $($cert.Subject)" `
+                    -version "" `
+                    -securePassword $SmtpPassword `
+                    -body $emailBody
+
+                # Update or add warning record
+                if ($lastWarning) {
+                    $lastWarning.LastWarningDate = $today
+                    $lastWarning | Update-AzTableRow -Table $table.CloudTable
+                } else {
+                    Add-AzTableRow `
+                        -Table $table.CloudTable `
+                        -PartitionKey "Certificates" `
+                        -RowKey $Thumbprint `
+                        -Property @{
+                            "LastWarningDate" = $today
+                            "CertificateSubject" = $cert.Subject
+                        }
+                }
+
+                Write-Warning "Certificate will expire in $daysUntilExpiry days - Warning email sent"
+            } else {
+                Write-Information "Certificate expiry warning already sent today"
+            }
+            return $false
+        }
+        
+        Write-Information "Certificate valid for $daysUntilExpiry days"
+        return $true
+    }
+    catch {
+        $errorMessage = "Error checking certificate expiry: $_"
+        Write-Error $errorMessage
+        
+        # Send error notification (errors always send regardless of daily limit)
+        Send-Email `
+            -subject "Certificate Check Error" `
+            -version "" `
+            -securePassword $SmtpPassword `
+            -body $errorMessage
+
+        return $false
+    }
+}
+
 # Main function to be triggered by the Azure Function
 function RunFunction {
     param($Timer)
     
-    # try {
+    try {
         Connect-AzAccount -Identity
 
         # Retrieve secrets from Azure Key Vault
@@ -81,10 +181,13 @@ function RunFunction {
         $tenantid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "tenantid" -AsPlainText
         $appid = Get-AzKeyVaultSecret -VaultName $vaultName -Name "appid" -AsPlainText
         $thumbprint = "F87409186E7544C2D93B79931987BF2BE313E336"
-
-        #$certsecret = Get-AzKeyVaultSecret -VaultName $vaultName -Name "fl-mailbox" -AsPlainText
-        
         $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
+
+        # Check certificate expiry
+        $certValid = Test-CertificateExpiry -Thumbprint $thumbprint -SmtpPassword $smtp2go
+        if (-not $certValid) {
+            Write-Warning "Certificate expiry check failed or certificate needs renewal"
+        }
 
         # Connect to SharePoint and get project list
         connect-pnponline -Url "https://firstlightca.sharepoint.com/sites/firstlightfiles" -Tenant $tenantid -ApplicationId $appid -Thumbprint $thumbprint
@@ -152,17 +255,17 @@ function RunFunction {
         remove-item -path "D:\local\projects.xlsx" -force
         disconnect-pnponline
         disconnect-azaccount
-    # }
-    # catch {
-        # Write-Error "Error in main function: $_"
-        # Send-Email -subject "Project Processing Error" `
-                #   -version "" `
-                #   -securePassword $smtp2go `
-                #   -body "Function failed with error: $_"
-    # }
-    # finally {
-         #Clear-TempFiles
-    # }
+    }
+    catch {
+        Write-Error "Error in main function: $_"
+        Send-Email -subject "Project Processing Error" `
+                  -version "" `
+                  -securePassword $smtp2go `
+                  -body "Function failed with error: $_"
+    }
+    finally {
+        Clear-TempFiles
+    }
 }
 
 # Timer trigger to run the function periodically
