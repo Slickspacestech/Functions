@@ -73,7 +73,10 @@ function Send-Email {
 function Test-CertificateExpiry {
     param(
         [Parameter(Mandatory=$true)]
-        [string]$Thumbprint,
+        [string]$CertificateName,
+        
+        [Parameter(Mandatory=$true)]
+        [string]$VaultName,
         
         [Parameter(Mandatory=$true)]
         [System.Security.SecureString]$SmtpPassword,
@@ -83,23 +86,25 @@ function Test-CertificateExpiry {
     )
 
     try {
-        # Get certificate from the store
-        $cert = Get-ChildItem -Path "Cert:\LocalMachine" -Recurse | where { $_.Thumbprint -eq $Thumbprint }
+        # Get certificate from Key Vault
+        $cert = Get-AzKeyVaultCertificate -VaultName $VaultName -Name $CertificateName
         if (-not $cert) {
-            throw "Certificate with thumbprint $Thumbprint not found"
+            throw "Certificate '$CertificateName' not found in vault '$VaultName'"
         }
 
         # Calculate days until expiry
-        $daysUntilExpiry = ($cert.NotAfter - (Get-Date)).Days
+        $daysUntilExpiry = ($cert.Certificate.NotAfter - (Get-Date)).Days
         
         # Create email body with certificate details
         $emailBody = @"
 Certificate Details:
 -------------------
-Subject: $($cert.Subject)
-Thumbprint: $($cert.Thumbprint)
-Expiry Date: $($cert.NotAfter)
+Name: $($cert.Name)
+Subject: $($cert.Certificate.Subject)
+Thumbprint: $($cert.Certificate.Thumbprint)
+Expiry Date: $($cert.Certificate.NotAfter)
 Days Remaining: $daysUntilExpiry
+Key Vault: $VaultName
 
 Please ensure the certificate is renewed before expiration.
 "@
@@ -118,13 +123,13 @@ Please ensure the certificate is renewed before expiration.
             }
             
             # Check last warning date
-            $lastWarning = Get-AzTableRow -Table $table.CloudTable -PartitionKey "Certificates" -RowKey $Thumbprint -ErrorAction SilentlyContinue
+            $lastWarning = Get-AzTableRow -Table $table.CloudTable -PartitionKey "Certificates" -RowKey $cert.Certificate.Thumbprint -ErrorAction SilentlyContinue
             $today = (Get-Date).Date
             
             if (-not $lastWarning -or ([DateTime]$lastWarning.LastWarningDate).Date -lt $today) {
                 # Send warning email
                 Send-Email `
-                    -subject "Certificate Expiry Warning - $($cert.Subject)" `
+                    -subject "Key Vault Certificate Expiry Warning - $($cert.Name)" `
                     -version "" `
                     -securePassword $SmtpPassword `
                     -body $emailBody
@@ -137,10 +142,11 @@ Please ensure the certificate is renewed before expiration.
                     Add-AzTableRow `
                         -Table $table.CloudTable `
                         -PartitionKey "Certificates" `
-                        -RowKey $Thumbprint `
+                        -RowKey $cert.Certificate.Thumbprint `
                         -Property @{
                             "LastWarningDate" = $today
-                            "CertificateSubject" = $cert.Subject
+                            "CertificateName" = $cert.Name
+                            "VaultName" = $VaultName
                         }
                 }
 
@@ -184,7 +190,10 @@ function RunFunction {
         $smtp2go = ConvertTo-SecureString(Get-AzKeyVaultSecret -VaultName $vaultName -Name "smtp2go-secure" -AsPlainText) -AsPlainText -Force
 
         # Check certificate expiry
-        $certValid = Test-CertificateExpiry -Thumbprint $thumbprint -SmtpPassword $smtp2go
+        $certValid = Test-CertificateExpiry `
+            -CertificateName "fl-mailbox" `
+            -VaultName $vaultName `
+            -SmtpPassword $smtp2go
         if (-not $certValid) {
             Write-Warning "Certificate expiry check failed or certificate needs renewal"
         }
