@@ -2,11 +2,20 @@
 # Requires Global Admin rights in Office 365
 
 # Import required modules
-Install-Module -Name Microsoft.Graph -Force
-Import-Module Microsoft.Graph
+Install-Module -Name Microsoft.Graph.Applications -Force
+Install-Module -Name Microsoft.Graph.Authentication -Force
+Install-Module -Name Microsoft.Graph.Identity.DirectoryManagement -Force
+Install-Module -Name Az.Resources -Force
+Install-Module -Name AzTable -Force
+
+Import-Module Microsoft.Graph.Applications
+Import-Module Microsoft.Graph.Authentication
+Import-Module Microsoft.Graph.Identity.DirectoryManagement
 Import-Module Az.Accounts
 Import-Module Az.Storage
 Import-Module Az.KeyVault
+Import-Module Az.Resources
+Import-Module AzTable
 
 # Connect to Microsoft Graph with admin consent scope
 Connect-MgGraph -Scopes "Application.ReadWrite.All", "Directory.ReadWrite.All"
@@ -63,18 +72,27 @@ $cert = New-SelfSignedCertificate -Subject "CN=$certName" `
     -NotAfter (Get-Date).AddYears(2)
 
 # Export certificate as PFX
-$pfxPassword = ConvertTo-SecureString -String "YourSecurePassword123!" -Force -AsPlainText
+$pfxPassword = ConvertTo-SecureString -String "Wn'i[92~dS.at0eL9<r!" -Force -AsPlainText
 $pfxPath = ".\Huntertech-$sanitizedTenantName.pfx"
 Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword
 
 # Add certificate to application
 $certBase64 = [System.Convert]::ToBase64String($cert.GetRawCertData())
-$certKeyCredential = @{
-    Type = "AsymmetricX509Cert"
-    Usage = "Verify"
-    Key = $certBase64
+
+$params = @{
+    keyCredentials = @(
+        @{
+            displayName = $certName
+            type = "AsymmetricX509Cert"
+            usage = "Verify"
+            key = [System.Convert]::FromBase64String($certBase64)  # Convert to byte array as per example
+            startDateTime = $cert.NotBefore
+            endDateTime = $cert.NotAfter
+        }
+    )
 }
-Add-MgApplicationKey -ApplicationId $app.Id -KeyCredential $certKeyCredential
+
+Update-MgApplication -ApplicationId $app.Id -BodyParameter $params
 
 function Add-TenantToAzure {
     param(
@@ -108,65 +126,92 @@ function Add-TenantToAzure {
         if (-not $table) {
             $table = New-AzStorageTable -Name $tableName -Context $ctx
         }
+
+        # Check if tenant already exists by querying for TenantName
+        $existingTenant = Get-AzTableRow -Table $table.CloudTable -PartitionKey "tenants" | 
+            Where-Object { $_.TenantName -eq $TenantName }
         
-        # Create unique RowKey
-        $rowKey = [guid]::NewGuid().ToString()
-        
-        # Add tenant record to table - ensuring exact schema match with CheckMailBoxStats
+        # Prepare table entry
         $tableEntry = @{
-            PartitionKey = "tenants"
-            RowKey = $rowKey
-            TenantName = $TenantName    # Used by Get-TenantsFromTable as Name
-            AppId = $AppId              # Used directly in Get-TenantsFromTable
-            CertThumbprint = $CertThumbprint  # Used directly in Get-TenantsFromTable
-            DateAdded = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")  # Additional metadata field
-            IsActive = $true            # Additional field for future use
+            TenantName = $TenantName
+            AppId = $AppId
+            CertThumbprint = $CertThumbprint
+            DateAdded = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+            IsActive = $true
         }
         
-        # Validate required fields are present and not empty
+        # Validate required fields
         if ([string]::IsNullOrEmpty($tableEntry.TenantName) -or 
             [string]::IsNullOrEmpty($tableEntry.AppId) -or 
             [string]::IsNullOrEmpty($tableEntry.CertThumbprint)) {
             throw "Required fields (TenantName, AppId, CertThumbprint) cannot be empty"
         }
-        
-        # Add to table
-        Add-AzTableRow -Table $table.CloudTable -Property $tableEntry
-        
-        # Upload certificate to Key Vault
-        $vaultName = "huntertechvault"
-        $certBytes = Get-Content $pfxPath -Encoding Byte
-        $certBase64 = [System.Convert]::ToBase64String($certBytes)
-        
-        # Create secret name based on tenant (sanitized)
-        $secretName = "cert-" + ($TenantName -replace '[^a-zA-Z0-9]', '')
-        
-        # Create Key Vault secret with certificate data
-        $secretValue = @{
-            data = $certBase64
-            password = $PfxPassword | ConvertFrom-SecureString -AsPlainText
-        } | ConvertTo-Json
-        
-        $secretValueSecure = ConvertTo-SecureString -String $secretValue -AsPlainText -Force
-        Set-AzKeyVaultSecret -VaultName $vaultName -Name $secretName -SecretValue $secretValueSecure
-        
-        Write-Host "Successfully added tenant to Azure storage and uploaded certificate to Key Vault"
-        Write-Host "Table Entry RowKey: $rowKey"
-        Write-Host "Key Vault Secret Name: $secretName"
-        Write-Host "Verifying table entry schema matches CheckMailBoxStats requirements..."
-        
-        # Verify the entry was created correctly
-        $verifyEntry = Get-AzTableRow -Table $table.CloudTable -PartitionKey "tenants" -RowKey $rowKey
-        if ($verifyEntry.TenantName -eq $TenantName -and 
-            $verifyEntry.AppId -eq $AppId -and 
-            $verifyEntry.CertThumbprint -eq $CertThumbprint) {
-            Write-Host "Table entry verified - schema matches CheckMailBoxStats requirements"
+
+        if ($existingTenant) {
+            # Update existing record
+            $tableEntry.Add("PartitionKey", $existingTenant.PartitionKey)
+            $tableEntry.Add("RowKey", $existingTenant.RowKey)
+            $tableEntry.Add("Etag", $existingTenant.Etag)
+            Update-AzTableRow -Table $table.CloudTable -Entity $tableEntry
+            $rowKey = $existingTenant.RowKey
         } else {
-            Write-Warning "Table entry verification failed - please check the data manually"
+            # Add new record
+            $rowKey = [guid]::NewGuid().ToString()
+            Add-AzTableRow -Table $table.CloudTable -Property $tableEntry -PartitionKey "tenants" -RowKey $rowKey
+        }
+        
+        # Handle certificate in Key Vault
+        $vaultName = "huntertechvault"
+        $certName = "cert2-" + ($TenantName -replace '[^a-zA-Z0-9]', '')
+
+        # Check if certificate exists in Key Vault
+        try {
+            $existingCert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -ErrorAction SilentlyContinue
+
+            if ($existingCert) {
+                # Check Key Vault properties for purge protection
+                $vault = Get-AzKeyVault -VaultName $vaultName
+                
+                if ($vault.EnablePurgeProtection) {
+                    Write-Warning "Cannot remove existing certificate - Purge Protection is enabled on Key Vault"
+                    Write-Warning "Using a new certificate name to avoid conflicts"
+                    # Generate a new unique name by appending timestamp
+                    $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+                    $certName = "cert2-" + ($TenantName -replace '[^a-zA-Z0-9]', '') + "-" + $timestamp
+                } else {
+                    # Remove the existing certificate
+                    Remove-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -Force
+                    # Ensure it's fully purged
+                    Remove-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -InRemovedState -Force
+                    Write-Host "Removed existing certificate from Key Vault"
+                }
+            }
+
+            # Import new certificate to Key Vault
+            $newCert = Import-AzKeyVaultCertificate `
+                -VaultName $vaultName `
+                -Name $certName `
+                -FilePath $PfxPath `
+                -Password $PfxPassword
+
+            # Update the table entry with the new certificate name if it was changed
+            if ($existingTenant -and $vault.EnablePurgeProtection) {
+                $tableEntry.CertThumbprint = $newCert.Thumbprint
+                Update-AzTableRow -Table $table.CloudTable -Entity $tableEntry
+            }
+
+            Write-Host "Successfully added/updated tenant in Azure storage and imported certificate to Key Vault"
+            Write-Host "Table Entry RowKey: $rowKey"
+            Write-Host "Key Vault Certificate Name: $certName"
+            Write-Host "Certificate Thumbprint: $($newCert.Thumbprint)"
+            Write-Host "Certificate Expiry: $($newCert.Expires)"
+        }
+        catch {
+            throw "Failed to manage certificate in Key Vault: $_"
         }
     }
     catch {
-        Write-Error "Failed to add tenant to Azure: $_"
+        Write-Error "Failed to add/update tenant in Azure: $_"
         throw
     }
 }
