@@ -8,7 +8,7 @@ Import-Module ExchangeOnlineManagement -RequiredVersion 3.4.0 -Force
 Import-Module Az.Accounts -Force
 Import-Module Az.KeyVault -Force
 Import-Module Az.Storage -Force
-
+Import-Module Microsoft.Graph.Users
 # Import common functions (mechanism depends on your deployment method)
 # . "./Common/HtFunctions.ps1"
 
@@ -180,8 +180,101 @@ function Get-TenantsFromTable {
     }
 }
 
+function Update-MailboxData {
+    param(
+        [Parameter(Mandatory=$true)]
+        [string]$TenantId,
+        [Parameter(Mandatory=$true)]
+        [object]$Mailbox,
+        [Parameter(Mandatory=$true)]
+        [object]$MailboxStats,
+        [Parameter(Mandatory=$false)]
+        [object]$ArchiveStats
+    )
+    
+    try {
+        # Get the mailbox table
+        $table = Get-HtStorageTable -TableName "mailboxes" -CreateIfNotExists
+        
+        # Try to get existing entity first
+        $existingEntity = Get-AzTableRow `
+            -Table $table.CloudTable `
+            -PartitionKey $TenantId `
+            -RowKey $Mailbox.UserPrincipalName
+        
+        # Get license information
+        $licenses = Get-MgUserLicenseDetail -UserId $Mailbox.UserPrincipalName
+        $licenseType = if ($licenses) {
+            ($licenses.SkuPartNumber -join ';')
+        } else { "Unlicensed" }
+
+        # Create entity
+        $entity = @{
+            PartitionKey = $TenantId
+            RowKey = $Mailbox.UserPrincipalName
+            
+            # Mailbox Properties
+            DisplayName = $Mailbox.DisplayName
+            EmailAddress = $Mailbox.PrimarySmtpAddress
+            MailboxType = $Mailbox.RecipientTypeDetails
+            IsLicensed = [bool]$licenses
+            LicenseType = $licenseType
+            
+            # Storage Metrics
+            TotalItemSize = $MailboxStats.TotalItemSize.Value.ToBytes()
+            TotalItemCount = $MailboxStats.ItemCount
+            DeletedItemSize = $MailboxStats.TotalDeletedItemSize.Value.ToBytes()
+            DeletedItemCount = $MailboxStats.DeletedItemCount
+            
+            # Add archive metrics if available
+            ArchiveItemSize = $ArchiveStats ? $ArchiveStats.TotalItemSize.Value.ToBytes() : 0
+            ArchiveItemCount = $ArchiveStats ? $ArchiveStats.ItemCount : 0
+            
+            # Status Information
+            LastLogonTime = $MailboxStats.LastLogonTime.ToString("yyyy-MM-dd HH:mm:ss")
+            IsActive = $Mailbox.IsEnabled
+            QuotaUsed = $MailboxStats.TotalItemSize.Value.ToBytes()
+            QuotaWarning = $Mailbox.IssueWarningQuota.Value.ToBytes()
+            QuotaLimit = $Mailbox.ProhibitSendReceiveQuota.Value.ToBytes()
+            
+            # Audit/Tracking
+            LastUpdated = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+        }
+
+        # Handle CreatedDate properly
+        if ($existingEntity) {
+            $entity.CreatedDate = $existingEntity.CreatedDate
+            
+            # Update existing entity
+            Update-AzTableRow `
+                -Table $table.CloudTable `
+                -Entity $entity
+
+            Write-Information "Updated existing mailbox data for $($Mailbox.UserPrincipalName)"
+        } else {
+            # For new entities, set CreatedDate
+            $entity.CreatedDate = [DateTime]::UtcNow.ToString("yyyy-MM-dd HH:mm:ss")
+            
+            # Add new entity
+            Add-AzTableRow `
+                -Table $table.CloudTable `
+                -Entity $entity
+
+            Write-Information "Added new mailbox data for $($Mailbox.UserPrincipalName)"
+        }
+        
+        return $true
+    }
+    catch {
+        Write-Error "Failed to update mailbox data for $($Mailbox.UserPrincipalName): $_"
+        return $false
+    }
+}
+
 function Check-MailboxSizes {
     param(
+        [Parameter(Mandatory=$true)]
+        [string]$TenantId,
         [Parameter(Mandatory=$true)]
         [string]$UserPrincipalName,
         [int64]$SizeThreshold = 45GB
@@ -192,20 +285,37 @@ function Check-MailboxSizes {
         $mailbox = Get-Mailbox $UserPrincipalName
         $archiveStats = $null
         
+        # Get archive stats if available
         if ($mailbox.ArchiveStatus -eq "Active") {
-            $archiveStats = Get-MailboxStatistics $UserPrincipalName -Archive
+            try {
+                $archiveStats = Get-MailboxStatistics $UserPrincipalName -Archive -ErrorAction Stop
+                Write-Information "Retrieved archive stats for $UserPrincipalName"
+            }
+            catch {
+                Write-Warning "Could not retrieve archive stats for $UserPrincipalName`: $_"
+            }
         }
         
-        if (($stats.TotalItemSize.Value.ToBytes() -gt $SizeThreshold) -or 
-            ($archiveStats -and $archiveStats.TotalItemSize.Value.ToBytes() -gt $SizeThreshold)) {
-            
+        # Store mailbox data
+        Update-MailboxData `
+            -TenantId $TenantId `
+            -Mailbox $mailbox `
+            -MailboxStats $stats `
+            -ArchiveStats $archiveStats
+        
+        # Check size and send alert if needed
+        $totalSize = $stats.TotalItemSize.Value.ToBytes()
+        $archiveSize = $archiveStats ? $archiveStats.TotalItemSize.Value.ToBytes() : 0
+        
+        if ($totalSize -gt $SizeThreshold -or $archiveSize -gt $SizeThreshold) {
             $emailBody = @"
 Mailbox Size Alert:
 
 User: $($mailbox.DisplayName)
 Email: $UserPrincipalName
-Primary Mailbox Size: $([math]::Round($stats.TotalItemSize.Value.ToBytes()/1GB, 2)) GB
-Archive Size: $([math]::Round(($archiveStats?.TotalItemSize.Value.ToBytes() ?? 0)/1GB, 2)) GB
+Primary Mailbox Size: $([math]::Round($totalSize/1GB, 2)) GB
+Archive Size: $([math]::Round($archiveSize/1GB, 2)) GB
+Total Size: $([math]::Round(($totalSize + $archiveSize)/1GB, 2)) GB
 "@
 
             Send-HtEmail `
@@ -220,6 +330,9 @@ Archive Size: $([math]::Round(($archiveStats?.TotalItemSize.Value.ToBytes() ?? 0
 
 # Main execution
 try {
+    # Import Microsoft Graph module for license information
+    Import-Module Microsoft.Graph.Users
+    
     Connect-HtAzureServices
     
     $tenants = Get-TenantsFromTable
@@ -230,12 +343,17 @@ try {
             continue
         }
         
+        # Connect to both Exchange Online and Microsoft Graph
         if (Connect-HtExchangeOnline -TenantName $tenant.Name -CertThumbprint $tenant.CertThumbprint -AppId $tenant.AppId) {
+            Connect-MgGraph -CertificateThumbprint $tenant.CertThumbprint -AppId $tenant.AppId -TenantId $tenant.PartitionKey
+            
             $mailboxes = Get-Mailbox -ResultSize Unlimited
             foreach ($mailbox in $mailboxes) {
-                Check-MailboxSizes -UserPrincipalName $mailbox.UserPrincipalName
+                Check-MailboxSizes -TenantId $tenant.PartitionKey -UserPrincipalName $mailbox.UserPrincipalName
             }
+            
             Disconnect-ExchangeOnline -Confirm:$false
+            Disconnect-MgGraph
         }
     }
 }
@@ -245,4 +363,5 @@ catch {
 }
 finally {
     Disconnect-ExchangeOnline -Confirm:$false
+    Disconnect-MgGraph
 }

@@ -1,66 +1,87 @@
-# Script to create Enterprise App for Huntertech with required permissions
-# Requires Global Admin rights in Office 365
+# Script to create Enterprise App for client tenant and configure Huntertech monitoring
+# Required modules
+$requiredModules = @(
+    @{Name = "Microsoft.Graph.Applications"; Version = "2.0.0"},
+    @{Name = "Microsoft.Graph.Authentication"; Version = "2.0.0"},
+    @{Name = "Az.Accounts"; Version = "2.10.0"},
+    @{Name = "Az.Storage"; Version = "5.0.0"},
+    @{Name = "Az.KeyVault"; Version = "4.0.0"},
+    @{Name = "Az.WebSites"; Version = "3.0.0"},
+    @{Name = "AzTable"; Version = "2.1.0"}
+)
 
-# Import required modules
-Install-Module -Name Microsoft.Graph.Applications -Force
-Install-Module -Name Microsoft.Graph.Authentication -Force
-Install-Module -Name Microsoft.Graph.Identity.DirectoryManagement -Force
-Install-Module -Name Az.Resources -Force
-Install-Module -Name AzTable -Force
+# Install and import required modules
+foreach ($module in $requiredModules) {
+    if (-not (Get-Module -ListAvailable -Name $module.Name | Where-Object { $_.Version -ge $module.Version })) {
+        Write-Host "Installing $($module.Name)..."
+        Install-Module -Name $module.Name -MinimumVersion $module.Version -Force
+    }
+    Import-Module -Name $module.Name -Force
+}
 
-Import-Module Microsoft.Graph.Applications
-Import-Module Microsoft.Graph.Authentication
-Import-Module Microsoft.Graph.Identity.DirectoryManagement
-Import-Module Az.Accounts
-Import-Module Az.Storage
-Import-Module Az.KeyVault
-Import-Module Az.Resources
-Import-Module AzTable
+# Constants
+$HT_SUBSCRIPTION_ID = "098c55e5-b140-49ba-a490-a1a51e259748"
+$HT_RESOURCE_GROUP = "htupdatechecker"
+$HT_STORAGE_ACCOUNT = "htupdatechecker"
+$HT_KEY_VAULT = "huntertechvault"
+$HT_FUNCTION_APP = "htupdatechecker2"
 
-# Connect to Microsoft Graph with admin consent scope
+function Update-ApplicationPermissions {
+    param (
+        [Parameter(Mandatory=$true)]
+        [string]$ApplicationId
+    )
+
+    $requiredResourceAccess = @(
+        @{
+            ResourceAppId = "00000003-0000-0000-c000-000000000000" # Microsoft Graph
+            ResourceAccess = @(
+                @{Id = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"; Type = "Role"}, # Application.Read.All
+                @{Id = "7ab1d382-f21e-4acd-a863-ba3e13f7da61"; Type = "Role"}, # Directory.Read.All
+                @{Id = "dc50a0fb-09a3-484d-be87-e023b12c6440"; Type = "Role"}, # Exchange.ManageAsApp
+                @{Id = "df021288-bdef-4463-88db-98f22de89214"; Type = "Role"}, # User.Read.All
+                @{Id = "25f85f3c-f66c-4205-8cd5-de92dd4dfec9"; Type = "Role"}, # Mail.Read
+                @{Id = "658aa5d8-239f-45c4-aa12-864f4fc7e490"; Type = "Role"}, # Mail.ReadWrite
+                @{Id = "6931bccd-447a-43d1-b442-00a195474933"; Type = "Role"}, # MailboxSettings.ReadWrite
+                @{Id = "5b567255-7703-4780-807c-7be8301ae99b"; Type = "Role"}, # Organization.Read.All
+                @{Id = "246dd0d5-5bd0-4def-940b-0421030a5b68"; Type = "Role"}, # Reports.Read.All
+                @{Id = "230c1aed-a721-4c5d-9cb4-a90514e508ef"; Type = "Role"}, # Policy.Read.All
+                @{Id = "483bed4a-2ad3-4361-a73b-c83ccdbdc53c"; Type = "Role"}, # SecurityEvents.Read.All
+                @{Id = "dc377aa6-52d8-4e23-b271-2a7ae04cedf3"; Type = "Role"}, # SecurityActions.Read.All
+                @{Id = "40f97065-369a-49f4-947c-6a255697ae91"; Type = "Role"}, # IdentityRiskyUser.Read.All
+                @{Id = "64733abd-851e-478a-bffb-e47a14b18235"; Type = "Role"}, # Security.Read.All
+                @{Id = "06da0dbc-49e2-44d2-8312-53f166ab848a"; Type = "Role"}  # Directory.Read.All
+            )
+        }
+    )
+
+    Update-MgApplication -ApplicationId $ApplicationId -RequiredResourceAccess $requiredResourceAccess
+}
+
+# Step 1: Connect to client tenant
+Write-Host "`n=== Step 1: Connecting to CLIENT tenant ===" -ForegroundColor Green
+Write-Host "Please sign in with CLIENT tenant Global Admin credentials..."
 Connect-MgGraph -Scopes "Application.ReadWrite.All", "Directory.ReadWrite.All"
 
-# Get tenant details
+# Get client tenant details
 $orgInfo = Get-MgOrganization
 $tenantName = $orgInfo.DisplayName
 $sanitizedTenantName = $tenantName -replace '[^a-zA-Z0-9]', ''
 
-# Create the Enterprise Application
+# Create or update app registration
 $appName = "Huntertech"
-$app = New-MgApplication -DisplayName $appName
+$app = Get-MgApplication -Filter "DisplayName eq '$appName'"
+if (-not $app) {
+    Write-Host "Creating new application: $appName"
+    $app = New-MgApplication -DisplayName $appName
+} else {
+    Write-Host "Found existing application: $appName"
+}
 
-# Create corresponding service principal
-$sp = New-MgServicePrincipal -AppId $app.AppId
+# Update permissions
+Update-ApplicationPermissions -ApplicationId $app.Id
 
-# Required permissions for the app
-$requiredResourceAccess = @(
-    # Microsoft Graph permissions
-    @{
-        ResourceAppId = "00000003-0000-0000-c000-000000000000" # Microsoft Graph
-        ResourceAccess = @(
-            # Application.Read.All
-            @{
-                Id = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"
-                Type = "Role"
-            }
-            # Directory.Read.All
-            @{
-                Id = "7ab1d382-f21e-4acd-a863-ba3e13f7da61"
-                Type = "Role"
-            }
-            # Exchange.ManageAsApp
-            @{
-                Id = "dc50a0fb-09a3-484d-be87-e023b12c6440"
-                Type = "Role"
-            }
-        )
-    }
-)
-
-# Update application with required permissions
-Update-MgApplication -ApplicationId $app.Id -RequiredResourceAccess $requiredResourceAccess
-
-# Generate self-signed certificate
+# Create and configure certificate
 $certName = "Huntertech-$sanitizedTenantName"
 $cert = New-SelfSignedCertificate -Subject "CN=$certName" `
     -CertStoreLocation "Cert:\CurrentUser\My" `
@@ -71,169 +92,130 @@ $cert = New-SelfSignedCertificate -Subject "CN=$certName" `
     -HashAlgorithm SHA256 `
     -NotAfter (Get-Date).AddYears(2)
 
-# Export certificate as PFX
+# Export certificate
 $pfxPassword = ConvertTo-SecureString -String "Wn'i[92~dS.at0eL9<r!" -Force -AsPlainText
 $pfxPath = ".\Huntertech-$sanitizedTenantName.pfx"
 Export-PfxCertificate -Cert $cert -FilePath $pfxPath -Password $pfxPassword
 
 # Add certificate to application
 $certBase64 = [System.Convert]::ToBase64String($cert.GetRawCertData())
-
 $params = @{
     keyCredentials = @(
         @{
             displayName = $certName
             type = "AsymmetricX509Cert"
             usage = "Verify"
-            key = [System.Convert]::FromBase64String($certBase64)  # Convert to byte array as per example
+            key = [System.Convert]::FromBase64String($certBase64)
             startDateTime = $cert.NotBefore
             endDateTime = $cert.NotAfter
         }
     )
 }
-
 Update-MgApplication -ApplicationId $app.Id -BodyParameter $params
 
-function Add-TenantToAzure {
-    param(
-        [Parameter(Mandatory=$true)]
-        [string]$TenantName,
-        [Parameter(Mandatory=$true)]
-        [string]$AppId,
-        [Parameter(Mandatory=$true)]
-        [string]$CertThumbprint,
-        [Parameter(Mandatory=$true)]
-        [string]$PfxPath,
-        [Parameter(Mandatory=$true)]
-        [SecureString]$PfxPassword
-    )
-    
-    try {
-        # Connect to Azure (if not already connected)
-        $azContext = Get-AzContext
-        if (-not $azContext) {
-            Connect-AzAccount
-        }
-        
-        # Get storage account context
-        $storageAccount = Get-AzStorageAccount -ResourceGroupName "htupdatechecker" -Name "htupdatechecker"
-        $ctx = $storageAccount.Context
-        
-        # Get table reference
-        $tableName = "tenants"
-        $table = Get-AzStorageTable -Name $tableName -Context $ctx -ErrorAction SilentlyContinue
-        
-        if (-not $table) {
-            $table = New-AzStorageTable -Name $tableName -Context $ctx
-        }
+# Step 2: Connect to Huntertech tenant
+Write-Host "`n=== Step 2: Connecting to HUNTERTECH tenant ===" -ForegroundColor Green
+Write-Host "Please sign in with HUNTERTECH tenant admin credentials..."
+Disconnect-AzAccount -ErrorAction SilentlyContinue
+Connect-AzAccount -Subscription $HT_SUBSCRIPTION_ID
 
-        # Check if tenant already exists by querying for TenantName
-        $existingTenant = Get-AzTableRow -Table $table.CloudTable -PartitionKey "tenants" | 
-            Where-Object { $_.TenantName -eq $TenantName }
-        
-        # Prepare table entry
-        $tableEntry = @{
-            TenantName = $TenantName
-            AppId = $AppId
-            CertThumbprint = $CertThumbprint
-            DateAdded = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
-            IsActive = $true
-        }
-        
-        # Validate required fields
-        if ([string]::IsNullOrEmpty($tableEntry.TenantName) -or 
-            [string]::IsNullOrEmpty($tableEntry.AppId) -or 
-            [string]::IsNullOrEmpty($tableEntry.CertThumbprint)) {
-            throw "Required fields (TenantName, AppId, CertThumbprint) cannot be empty"
-        }
-
-        if ($existingTenant) {
-            # Update existing record
-            $tableEntry.Add("PartitionKey", $existingTenant.PartitionKey)
-            $tableEntry.Add("RowKey", $existingTenant.RowKey)
-            $tableEntry.Add("Etag", $existingTenant.Etag)
-            Update-AzTableRow -Table $table.CloudTable -Entity $tableEntry
-            $rowKey = $existingTenant.RowKey
-        } else {
-            # Add new record
-            $rowKey = [guid]::NewGuid().ToString()
-            Add-AzTableRow -Table $table.CloudTable -Property $tableEntry -PartitionKey "tenants" -RowKey $rowKey
-        }
-        
-        # Handle certificate in Key Vault
-        $vaultName = "huntertechvault"
-        $certName = "cert2-" + ($TenantName -replace '[^a-zA-Z0-9]', '')
-
-        # Check if certificate exists in Key Vault
-        try {
-            $existingCert = Get-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -ErrorAction SilentlyContinue
-
-            if ($existingCert) {
-                # Check Key Vault properties for purge protection
-                $vault = Get-AzKeyVault -VaultName $vaultName
-                
-                if ($vault.EnablePurgeProtection) {
-                    Write-Warning "Cannot remove existing certificate - Purge Protection is enabled on Key Vault"
-                    Write-Warning "Using a new certificate name to avoid conflicts"
-                    # Generate a new unique name by appending timestamp
-                    $timestamp = Get-Date -Format "yyyyMMddHHmmss"
-                    $certName = "cert2-" + ($TenantName -replace '[^a-zA-Z0-9]', '') + "-" + $timestamp
-                } else {
-                    # Remove the existing certificate
-                    Remove-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -Force
-                    # Ensure it's fully purged
-                    Remove-AzKeyVaultCertificate -VaultName $vaultName -Name $certName -InRemovedState -Force
-                    Write-Host "Removed existing certificate from Key Vault"
-                }
-            }
-
-            # Import new certificate to Key Vault
-            $newCert = Import-AzKeyVaultCertificate `
-                -VaultName $vaultName `
-                -Name $certName `
-                -FilePath $PfxPath `
-                -Password $PfxPassword
-
-            # Update the table entry with the new certificate name if it was changed
-            if ($existingTenant -and $vault.EnablePurgeProtection) {
-                $tableEntry.CertThumbprint = $newCert.Thumbprint
-                Update-AzTableRow -Table $table.CloudTable -Entity $tableEntry
-            }
-
-            Write-Host "Successfully added/updated tenant in Azure storage and imported certificate to Key Vault"
-            Write-Host "Table Entry RowKey: $rowKey"
-            Write-Host "Key Vault Certificate Name: $certName"
-            Write-Host "Certificate Thumbprint: $($newCert.Thumbprint)"
-            Write-Host "Certificate Expiry: $($newCert.Expires)"
-        }
-        catch {
-            throw "Failed to manage certificate in Key Vault: $_"
-        }
-    }
-    catch {
-        Write-Error "Failed to add/update tenant in Azure: $_"
-        throw
-    }
+# Get storage account context and create/update table
+$storageAccount = Get-AzStorageAccount -ResourceGroupName $HT_RESOURCE_GROUP -Name $HT_STORAGE_ACCOUNT
+$ctx = $storageAccount.Context
+$tableName = "tenants"
+$table = Get-AzStorageTable -Name $tableName -Context $ctx -ErrorAction SilentlyContinue
+if (-not $table) {
+    $table = New-AzStorageTable -Name $tableName -Context $ctx
 }
 
-# After certificate creation, add call to new function
-try {
-    Add-TenantToAzure `
-        -TenantName $tenantName `
-        -AppId $app.AppId `
-        -CertThumbprint $cert.Thumbprint `
-        -PfxPath $pfxPath `
-        -PfxPassword $pfxPassword
-    
-    Write-Host "Enterprise Application created and Azure resources updated successfully!"
-    Write-Host "Application ID: $($app.AppId)"
-    Write-Host "Certificate Thumbprint: $($cert.Thumbprint)"
-    Write-Host "PFX file exported to: $pfxPath"
-    Write-Host "Tenant Name: $tenantName"
-    Write-Host ""
-    Write-Host "Important: Store these credentials securely and grant admin consent in Azure Portal"
+# Update table entry
+$tableEntry = @{
+    PartitionKey = "tenants"
+    RowKey = [guid]::NewGuid().ToString()
+    TenantName = $tenantName
+    AppId = $app.AppId
+    CertThumbprint = $cert.Thumbprint
+    DateAdded = (Get-Date).ToString("yyyy-MM-dd HH:mm:ss")
+    IsActive = $true
 }
-catch {
-    Write-Error "Failed to complete setup: $_"
+
+$existingTenant = Get-AzTableRow -Table $table.CloudTable -PartitionKey "tenants" | 
+    Where-Object { $_.TenantName -eq $tenantName }
+
+if ($existingTenant) {
+    $existingTenant.AppId = $tableEntry.AppId
+    $existingTenant.CertThumbprint = $tableEntry.CertThumbprint
+    $existingTenant.DateAdded = $tableEntry.DateAdded
+    $existingTenant.IsActive = $tableEntry.IsActive
+    Update-AzTableRow -Table $table.CloudTable -Entity $existingTenant
+} else {
+    Add-AzTableRow -Table $table.CloudTable -Property $tableEntry
 }
+
+# Import certificate to Key Vault
+$kvCertName = "cert2-$sanitizedTenantName"
+$existingCert = Get-AzKeyVaultCertificate -VaultName $HT_KEY_VAULT -Name $kvCertName -ErrorAction SilentlyContinue
+if (-not $existingCert) {
+    $existingCert = Get-AzKeyVaultCertificate -VaultName $HT_KEY_VAULT -Name $kvCertName -ErrorAction SilentlyContinue -InRemovedState
+}
+
+if ($existingCert) {
+    $timestamp = Get-Date -Format "yyyyMMddHHmmss"
+    $kvCertName = "cert2-$sanitizedTenantName-$timestamp"
+}
+
+$newCert = Import-AzKeyVaultCertificate -VaultName $HT_KEY_VAULT -Name $kvCertName -FilePath $pfxPath -Password $pfxPassword
+
+# Import certificate to Azure Function
+Write-Host "`n=== Step 3: Importing certificate to Azure Function ===" -ForegroundColor Green
+$functionApp = Get-AzWebApp -ResourceGroupName $HT_RESOURCE_GROUP -Name $HT_FUNCTION_APP
+$kvSecretId = $newCert.SecretId
+
+# Add Key Vault reference to Function App
+$certificates = @()
+if ($functionApp.ClientCertEnabled) {
+    $certificates = $functionApp.ClientCertificates
+}
+$certificates += @{
+    KeyVaultId = $kvSecretId
+    Name = $kvCertName
+}
+
+#Set-AzWebApp -ResourceGroupName $HT_RESOURCE_GROUP -Name $HT_FUNCTION_APP -ClientCertEnabled $true -ClientCertificates $certificates
+
+# Add this verification section before the final summary
+Write-Host "`n=== Verifying Certificate Thumbprints ===" -ForegroundColor Green
+
+# Get the app registration certificate thumbprint
+$appCerts = Get-MgApplication -ApplicationId $app.Id | 
+    Select-Object -ExpandProperty KeyCredentials
+$appThumbprint = $appCerts | 
+    Where-Object { $_.DisplayName -eq $certName } | 
+    Select-Object -ExpandProperty CustomKeyIdentifier | 
+    ForEach-Object { [System.Convert]::ToHexString($_).ToUpper() }
+
+# Get the Key Vault certificate thumbprint
+$kvThumbprint = $newCert.Thumbprint
+
+# Compare thumbprints
+if ($appThumbprint -eq $kvThumbprint) {
+    Write-Host "Certificate thumbprint verification successful!" -ForegroundColor Green
+    Write-Host "App Registration Thumbprint: $appThumbprint"
+    Write-Host "Key Vault Certificate Thumbprint: $kvThumbprint"
+} else {
+    Write-Host "WARNING: Certificate thumbprint mismatch!" -ForegroundColor Red
+    Write-Host "App Registration Thumbprint: $appThumbprint"
+    Write-Host "Key Vault Certificate Thumbprint: $kvThumbprint"
+    Write-Host "Please verify the certificate configuration manually."
+    throw "Certificate thumbprint mismatch detected"
+}
+
+# Output summary
+Write-Host "`n=== Configuration Complete ===" -ForegroundColor Green
+Write-Host "Client Tenant Name: $tenantName"
+Write-Host "Application ID: $($app.AppId)"
+Write-Host "Certificate Thumbprint: $($cert.Thumbprint)"
+Write-Host "Key Vault Certificate Name: $kvCertName"
+Write-Host "PFX file exported to: $pfxPath"
+Write-Host "`nIMPORTANT: Please grant admin consent in the Azure Portal for the application permissions & import cert into azure functions"
 
