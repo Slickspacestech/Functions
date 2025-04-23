@@ -227,8 +227,8 @@ function Update-MailboxData {
             DeletedItemCount = $MailboxStats.DeletedItemCount
             
             # Add archive metrics if available
-            ArchiveItemSize = $ArchiveStats ? $ArchiveStats.TotalItemSize.Value.ToBytes() : 0
-            ArchiveItemCount = $ArchiveStats ? $ArchiveStats.ItemCount : 0
+            ArchiveItemSize = if ($ArchiveStats) { $ArchiveStats.TotalItemSize.Value.ToBytes() } else { 0 }
+            ArchiveItemCount = if ($ArchiveStats) { $ArchiveStats.ItemCount } else { 0 }
             
             # Status Information
             LastLogonTime = $MailboxStats.LastLogonTime.ToString("yyyy-MM-dd HH:mm:ss")
@@ -305,7 +305,7 @@ function Check-MailboxSizes {
         
         # Check size and send alert if needed
         $totalSize = $stats.TotalItemSize.Value.ToBytes()
-        $archiveSize = $archiveStats ? $archiveStats.TotalItemSize.Value.ToBytes() : 0
+        $archiveSize = if ($archiveStats) { $archiveStats.TotalItemSize.Value.ToBytes() } else { 0 }
         
         if ($totalSize -gt $SizeThreshold -or $archiveSize -gt $SizeThreshold) {
             $emailBody = @"
