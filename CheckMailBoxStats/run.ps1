@@ -113,7 +113,7 @@ function Connect-HtExchangeOnline {
         return $true
     }
     catch {
-        Write-Error "Failed to connect to Exchange for tenant $TenantName: $_"
+        Write-Error "Failed to connect to Exchange for tenant $($TenantName): $_"
         return $false
     }
 }
@@ -145,7 +145,7 @@ function Get-HtStorageTable {
         return $table
     }
     catch {
-        Write-Error "Failed to get/create storage table '$TableName': $_"
+        Write-Error "Failed to get/create storage table $($TableName): $_"
         throw
     }
 }
@@ -292,7 +292,7 @@ function Check-MailboxSizes {
                 Write-Information "Retrieved archive stats for $UserPrincipalName"
             }
             catch {
-                Write-Warning "Could not retrieve archive stats for $UserPrincipalName`: $_"
+                Write-Warning "Could not retrieve archive stats for $($UserPrincipalName): $_"
             }
         }
         
@@ -324,7 +324,7 @@ Total Size: $([math]::Round(($totalSize + $archiveSize)/1GB, 2)) GB
         }
     }
     catch {
-        Write-Error "Error checking mailbox size for $UserPrincipalName`: $_"
+        Write-Error "Error checking mailbox size for $($UserPrincipalName): $_"
     }
 }
 
