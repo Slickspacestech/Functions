@@ -38,19 +38,13 @@ function Update-ApplicationPermissions {
             ResourceAccess = @(
                 @{Id = "9a5d68dd-52b0-4cc2-bd40-abcf44ac3a30"; Type = "Role"}, # Application.Read.All
                 @{Id = "7ab1d382-f21e-4acd-a863-ba3e13f7da61"; Type = "Role"}, # Directory.Read.All
-                @{Id = "dc50a0fb-09a3-484d-be87-e023b12c6440"; Type = "Role"}, # Exchange.ManageAsApp
                 @{Id = "df021288-bdef-4463-88db-98f22de89214"; Type = "Role"}, # User.Read.All
-                @{Id = "25f85f3c-f66c-4205-8cd5-de92dd4dfec9"; Type = "Role"}, # Mail.Read
-                @{Id = "658aa5d8-239f-45c4-aa12-864f4fc7e490"; Type = "Role"}, # Mail.ReadWrite
-                @{Id = "6931bccd-447a-43d1-b442-00a195474933"; Type = "Role"}, # MailboxSettings.ReadWrite
                 @{Id = "5b567255-7703-4780-807c-7be8301ae99b"; Type = "Role"}, # Organization.Read.All
                 @{Id = "246dd0d5-5bd0-4def-940b-0421030a5b68"; Type = "Role"}, # Reports.Read.All
                 @{Id = "230c1aed-a721-4c5d-9cb4-a90514e508ef"; Type = "Role"}, # Policy.Read.All
                 @{Id = "483bed4a-2ad3-4361-a73b-c83ccdbdc53c"; Type = "Role"}, # SecurityEvents.Read.All
                 @{Id = "dc377aa6-52d8-4e23-b271-2a7ae04cedf3"; Type = "Role"}, # SecurityActions.Read.All
                 @{Id = "40f97065-369a-49f4-947c-6a255697ae91"; Type = "Role"}, # IdentityRiskyUser.Read.All
-                @{Id = "64733abd-851e-478a-bffb-e47a14b18235"; Type = "Role"}, # Security.Read.All
-                @{Id = "06da0dbc-49e2-44d2-8312-53f166ab848a"; Type = "Role"}  # Directory.Read.All
             )
         }
     )

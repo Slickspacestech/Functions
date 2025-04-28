@@ -169,6 +169,10 @@ function RunFunction {
         @{
             "product" = "RVTLT"
             "year" = "2025"
+        },
+        @{
+            "product" = "RVTLT"
+            "year" = "2026"
         }
     )
         foreach ($item in $autodesk_products) {
