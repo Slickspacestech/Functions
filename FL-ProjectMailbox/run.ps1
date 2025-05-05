@@ -31,13 +31,15 @@ function Clear-TempFiles {
 
         Get-ChildItem -Path $tempPath -File -Recurse -ErrorAction SilentlyContinue | 
             ForEach-Object {
-                try {
-                    Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
-                    Write-Debug "Deleted: $($_.FullName)"
-                }
-                catch {
-                    Write-Debug "Could not delete: $($_.FullName)"
-                    continue
+                if ($_.FullName -notlike "*exchange.format.ps1xml*") {
+                    try {
+                        Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+                        Write-Debug "Deleted: $($_.FullName)"
+                    }
+                    catch {
+                        Write-Debug "Could not delete: $($_.FullName)"
+                        continue
+                    }
                 }
             }
         
