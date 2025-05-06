@@ -29,21 +29,32 @@ function Clear-TempFiles {
             return
         }
 
-        Get-ChildItem -Path $tempPath -File -Recurse -ErrorAction SilentlyContinue | 
-            ForEach-Object {
-                if ($_.FullName -notlike "*exchange.format.ps1xml*") {
-                    try {
-                        Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
-                        Write-Debug "Deleted: $($_.FullName)"
-                    }
-                    catch {
-                        Write-Debug "Could not delete: $($_.FullName)"
-                        continue
-                    }
-                }
-            }
+        # Get-ChildItem -Path $tempPath -File -Recurse -ErrorAction SilentlyContinue | 
+        #     ForEach-Object {
+        #         if ($_.FullName -notlike "*exchange.format.ps1xml*") {
+        #             try {
+        #                 Remove-Item -Path $_.FullName -Force -ErrorAction SilentlyContinue
+        #                 Write-Debug "Deleted: $($_.FullName)"
+        #             }
+        #             catch {
+        #                 Write-Debug "Could not delete: $($_.FullName)"
+        #                 continue
+        #             }
+        #         }
+        #     }
         
-        Write-Information "Temp file cleanup completed"
+        # Write-Information "Temp file cleanup completed"
+
+
+        # Get the size of all files in the temporary folder
+        $folderSize = Get-ChildItem -Path $tempPath -Recurse | Measure-Object -Property Length -Sum
+
+        # Convert the size from bytes to megabytes
+        $sizeInMB = [math]::Round($folderSize.Sum / 1MB, 2)
+
+        # Display the total size
+        Write-Information "The total size of the temporary folder is $sizeInMB MB"
+
     }
     catch {
         Write-Warning "Error during temp cleanup: $_"
