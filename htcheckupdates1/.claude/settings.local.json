@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:www.taxcycle.com)",
+      "Bash(powershell:*)"
+    ],
+    "deny": []
+  }
+}
