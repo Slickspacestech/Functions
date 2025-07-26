@@ -1,0 +1,150 @@
+{
+  "products": [
+    {
+      "id": "bluebeam-revu",
+      "name": "Bluebeam Revu",
+      "url": "https://support.bluebeam.com/en-us/release-notes-all.html",
+      "strategy": "regex",
+      "pattern": "<p[^>]*>(?:(?!</p>).)*?Revu\\s+(\\d{2}\\.\\d\\.\\d)[^<]*",
+      "versionGroup": 1,
+      "keyVaultKey": "BBversion",
+      "enabled": true
+    },
+    {
+      "id": "taxcycle",
+      "name": "TaxCycle",
+      "url": "https://www.taxcycle.com/support/download/",
+      "strategy": "regex",
+      "pattern": "TaxCycle Version\\s+(\\d+\\.\\d+\\.\\d+(?:\\.\\d+)?)",
+      "versionGroup": 1,
+      "keyVaultKey": "TaxCycleVersion",
+      "enabled": true
+    },
+    {
+      "id": "autocad-lt-2023",
+      "name": "AutoCAD LT 2023",
+      "url": "https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-LT-ReleaseNotes/files/AUTOCADLT_2023_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACDLT2023",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "autocad-lt-2024",
+      "name": "AutoCAD LT 2024",
+      "url": "https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-LT-ReleaseNotes/files/AUTOCADLT_2024_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACDLT2024",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "autocad-lt-2025",
+      "name": "AutoCAD LT 2025",
+      "url": "https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-LT-ReleaseNotes/files/AUTOCADLT_2025_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACDLT2025",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "autocad-2023",
+      "name": "AutoCAD 2023",
+      "url": "https://help.autodesk.com/cloudhelp/2023/ENU/AutoCAD-ReleaseNotes/files/AUTOCAD_2023_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACD2023",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "autocad-2024",
+      "name": "AutoCAD 2024",
+      "url": "https://help.autodesk.com/cloudhelp/2024/ENU/AutoCAD-ReleaseNotes/files/AUTOCAD_2024_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACD2024",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "autocad-2025",
+      "name": "AutoCAD 2025",
+      "url": "https://help.autodesk.com/cloudhelp/2025/ENU/AutoCAD-ReleaseNotes/files/AUTOCAD_2025_UPDATES.html",
+      "strategy": "custom",
+      "keyVaultKey": "ACD2025",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-2023",
+      "name": "Revit 2023",
+      "url": "https://help.autodesk.com/cloudhelp/2023/ENU/RevitReleaseNotes/files/RevitReleaseNotes_2023updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVT2023",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-2024",
+      "name": "Revit 2024",
+      "url": "https://help.autodesk.com/cloudhelp/2024/ENU/RevitReleaseNotes/files/RevitReleaseNotes_2024updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVT2024",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-2025",
+      "name": "Revit 2025",
+      "url": "https://help.autodesk.com/cloudhelp/2025/ENU/RevitReleaseNotes/files/RevitReleaseNotes_2025updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVT2025",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-2026",
+      "name": "Revit 2026",
+      "url": "https://help.autodesk.com/cloudhelp/2026/ENU/RevitReleaseNotes/files/RevitReleaseNotes_2026updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVT2026",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-lt-2023",
+      "name": "Revit LT 2023",
+      "url": "https://help.autodesk.com/cloudhelp/2023/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_2023updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVTLT2023",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-lt-2024",
+      "name": "Revit LT 2024",
+      "url": "https://help.autodesk.com/cloudhelp/2024/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_2024updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVTLT2024",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-lt-2025",
+      "name": "Revit LT 2025",
+      "url": "https://help.autodesk.com/cloudhelp/2025/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_2025updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVTLT2025",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    },
+    {
+      "id": "revit-lt-2026",
+      "name": "Revit LT 2026",
+      "url": "https://help.autodesk.com/cloudhelp/2026/ENU/RevitLTReleaseNotes/files/RevitLTReleaseNotes_2026updates_html.html",
+      "strategy": "custom",
+      "keyVaultKey": "RVTLT2026",
+      "enabled": true,
+      "script": "param($url)\n$html = Invoke-RestMethod -Uri $url -Method Get -UseBasicParsing\ntry {\n    $updates = $html.html.body.div.ul.li.a\n    $latest = $updates[0].'#text'.replace(' Update','')\n    return $latest\n} catch {\n    return $null\n}"
+    }
+  ]
+}
