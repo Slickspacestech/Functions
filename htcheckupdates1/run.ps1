@@ -332,7 +332,27 @@ function Get-ProductConfiguration {
         $configJson = Get-AzKeyVaultSecret -VaultName $vaultName -Name "config-products" -AsPlainText
         if ($configJson) {
             $config = $configJson | ConvertFrom-Json
-            return $config.products
+            # Convert PSCustomObject array to hashtable array
+            $products = @()
+            foreach ($product in $config.products) {
+                $hashtable = @{}
+                foreach ($prop in $product.PSObject.Properties) {
+                    # Handle nested objects and preserve all property types
+                    if ($prop.Value -is [System.Management.Automation.PSCustomObject]) {
+                        # Convert nested PSCustomObject to hashtable
+                        $nestedHash = @{}
+                        foreach ($nestedProp in $prop.Value.PSObject.Properties) {
+                            $nestedHash[$nestedProp.Name] = $nestedProp.Value
+                        }
+                        $hashtable[$prop.Name] = $nestedHash
+                    }
+                    else {
+                        $hashtable[$prop.Name] = $prop.Value
+                    }
+                }
+                $products += $hashtable
+            }
+            return $products
         }
     }
     catch {
