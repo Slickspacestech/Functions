@@ -1,7 +1,7 @@
 # SynapseContactSync - Azure Function for Synapse Accounting T1 Contact Management
 # Syncs contacts from SharePoint Excel file to Exchange Online Distribution List
 # Runs daily at 6:00 AM UTC
-
+#v2.1
 param($Timer)
 
 $currentUTCtime = (Get-Date).ToUniversalTime()
