@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "WebFetch(domain:www.taxcycle.com)",
-      "Bash(powershell:*)"
+      "Bash(powershell:*)",
+      "WebFetch(domain:support.thunderheadeng.com)",
+      "WebFetch(domain:autosprink.com)",
+      "WebFetch(domain:api-v2.mepcad.com)",
+      "Bash(del check-21-versions.ps1 find-21-8-context.ps1)",
+      "WebFetch(domain:www.thunderheadeng.com)",
+      "WebFetch(domain:support.bluebeam.com)"
     ],
     "deny": []
   }

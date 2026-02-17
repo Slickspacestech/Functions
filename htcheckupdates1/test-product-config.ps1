@@ -76,6 +76,6 @@ foreach ($product in $config.products) {
         Write-Host "✗ FAILED: $version" -ForegroundColor Red
     }
     
-    Write-Host "-" * 60
+    Write-Host ("-" * 60)
     Write-Host ""
 }

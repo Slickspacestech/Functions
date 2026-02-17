@@ -140,6 +140,17 @@ $products += @{
 Set-ProductConfiguration "huntertechvault" $products
 ```
 
+### Adding Products to Configuration
+
+When adding new products to `products-config.json`:
+
+1. **Add the product configuration** with a unique `keyVaultKey` (e.g., `AutoSPRINK2025`)
+2. **The system will automatically create missing Key Vault keys** for new products on the next run
+3. **Update the configuration to Key Vault** so it will be read on subsequent runs
+4. The function will detect the new version and store it in the Key Vault secret specified by `keyVaultKey`
+
+**Important**: After adding a new product locally in `products-config.json`, you must update the configuration in Key Vault (`config-products` secret) for the changes to take effect in the deployed Azure Function.
+
 ## Development Notes
 
 ### Azure Function Context

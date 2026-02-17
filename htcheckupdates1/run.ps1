@@ -369,9 +369,9 @@ function Get-DefaultProductConfiguration {
         @{
             "id" = "bluebeam-revu"
             "name" = "Bluebeam Revu"
-            "url" = "https://support.bluebeam.com/en-us/release-notes-all.html"
+            "url" = "https://support.bluebeam.com/revu/resources/revu-21-release-notes.html"
             "strategy" = "regex"
-            "pattern" = '<p[^>]*>(?:(?!</p>).)*?Revu\s+(\d{2}\.\d\.\d)[^<]*'
+            "pattern" = 'Revu(?:</[^>]+>)?\s+(\d{1,2}\.\d{1,2}(?:\.\d+)?)'
             "versionGroup" = 1
             "keyVaultKey" = "BBversion"
             "enabled" = $true
