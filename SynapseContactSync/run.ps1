@@ -197,14 +197,22 @@ function Sync-ContactsFromExcel {
                 $existingContact = $existingContactsMap[$email.ToLower()]
 
                 if ($existingContact) {
-                    Write-Host "  Updating existing contact"
+                    # Only update if something actually changed
+                    $needsUpdate = ($existingContact.DisplayName -ne $displayName) -or
+                                   ($existingContact.CustomAttribute1 -ne $CustomAttributeValue)
 
-                    Set-MailContact -Identity $email `
-                        -DisplayName $displayName `
-                        -CustomAttribute1 $CustomAttributeValue `
-                        -ErrorAction Stop
-
-                    $updated++
+                    if ($needsUpdate) {
+                        Write-Host "  Updating existing contact"
+                        Set-MailContact -Identity $email `
+                            -DisplayName $displayName `
+                            -CustomAttribute1 $CustomAttributeValue `
+                            -ErrorAction Stop
+                        $updated++
+                    }
+                    else {
+                        Write-Host "  No changes needed"
+                        $skipped++
+                    }
                 }
                 else {
                     Write-Host "  Creating new contact"
