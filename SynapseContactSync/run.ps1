@@ -78,8 +78,8 @@ function New-MailContactWithRetry {
 
             Write-Host "  Created contact with alias: $finalAlias"
 
-            # Brief pause to allow Exchange to propagate
-            Start-Sleep -Seconds 2
+            # Brief pause to allow Exchange to propagate (reduced from 2s)
+            Start-Sleep -Milliseconds 500
 
             Set-MailContact -Identity $Email `
                 -CustomAttribute1 $CustomAttributeValue `
@@ -151,6 +151,16 @@ function Sync-ContactsFromExcel {
             }
         }
 
+        # Get ALL existing mail contacts with our custom attribute upfront (single query)
+        Write-Host "Fetching existing mail contacts..."
+        $existingMailContacts = Get-MailContact -ResultSize Unlimited | Where-Object { $_.CustomAttribute1 -eq $CustomAttributeValue }
+        $existingContactsMap = @{}
+        foreach ($mc in $existingMailContacts) {
+            $extEmail = ($mc.ExternalEmailAddress -replace '^SMTP:', '').ToLower()
+            $existingContactsMap[$extEmail] = $mc
+        }
+        Write-Host "Found $($existingContactsMap.Count) existing managed contacts"
+
         # Track emails in Excel for removal check later
         $excelEmails = @{}
 
@@ -183,8 +193,8 @@ function Sync-ContactsFromExcel {
 
                 Write-Host "Processing: $email ($displayName)"
 
-                # Check if contact exists
-                $existingContact = Get-MailContact -Identity $email -ErrorAction SilentlyContinue
+                # Check if contact exists using pre-fetched hashtable (no Exchange round-trip)
+                $existingContact = $existingContactsMap[$email.ToLower()]
 
                 if ($existingContact) {
                     Write-Host "  Updating existing contact"
@@ -245,8 +255,8 @@ function Sync-ContactsFromExcel {
         }
 
         # Remove contacts no longer in Excel (bidirectional sync)
+        # Using $existingMailContacts already fetched at the start
         Write-Host "`nChecking for contacts to remove..."
-        $existingMailContacts = Get-MailContact -ResultSize Unlimited | Where-Object { $_.CustomAttribute1 -eq $CustomAttributeValue }
         $removed = 0
 
         foreach ($existingContact in $existingMailContacts) {
