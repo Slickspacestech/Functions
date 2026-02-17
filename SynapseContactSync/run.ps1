@@ -1,7 +1,7 @@
 # SynapseContactSync - Azure Function for Synapse Accounting T1 Contact Management
 # Syncs contacts from SharePoint Excel file to Exchange Online Distribution List
 # Runs daily at 6:00 AM UTC
-#v2.2
+#v2.3
 param($Timer)
 
 $currentUTCtime = (Get-Date).ToUniversalTime()
@@ -195,7 +195,7 @@ function Sync-ContactsFromExcel {
                 $existingContact = $existingContactsMap[$email.ToLower()]
 
                 if ($existingContact) {
-                    # Only update if something actually changed
+                    # Contact is already managed - check if needs update
                     $needsUpdate = ($existingContact.DisplayName -ne $displayName) -or
                                    ($existingContact.CustomAttribute1 -ne $CustomAttributeValue)
 
@@ -211,38 +211,56 @@ function Sync-ContactsFromExcel {
                         Write-Host "  No changes needed"
                         $skipped++
                     }
-                }
-                else {
-                    Write-Host "  Creating new contact"
 
-                    # Generate base alias from email prefix
-                    $baseAlias = $email.Split('@')[0] -replace '[^a-zA-Z0-9]', ''
-
-                    # Create contact (CustomAttribute1 will be set in batch later)
-                    $newContact = New-MailContactWithRetry `
-                        -Email $email `
-                        -DisplayName $displayName `
-                        -BaseAlias $baseAlias `
-                        -FirstName $firstName `
-                        -LastName $lastName `
-                        -CustomAttributeValue $CustomAttributeValue
-
-                    if ($newContact) {
-                        # Store email and DG info for batch processing after replication
-                        $newContact.NeedsAddToDG = -not $dgMemberEmails.ContainsKey($email.ToLower())
-                        $newlyCreatedContacts += $newContact
-                    }
-                    $created++
-                }
-                else {
-                    # Only add existing contacts to DG immediately (they're already replicated)
+                    # Ensure in DG
                     if (-not $dgMemberEmails.ContainsKey($email.ToLower())) {
                         Write-Host "  Adding to distribution group: $DistributionGroup"
                         Add-DistributionGroupMember -Identity $DistributionGroup -Member $email -ErrorAction Stop
                         $dgMemberEmails[$email.ToLower()] = $true
                     }
+                }
+                else {
+                    # Not in managed contacts - check if contact exists but is orphaned (no CustomAttribute1)
+                    $orphanedContact = Get-MailContact -Identity $email -ErrorAction SilentlyContinue
+
+                    if ($orphanedContact) {
+                        # Contact exists but wasn't marked as managed - adopt it
+                        Write-Host "  Found orphaned contact - adopting and setting attributes"
+                        Set-MailContact -Identity $email `
+                            -DisplayName $displayName `
+                            -CustomAttribute1 $CustomAttributeValue `
+                            -ErrorAction Stop
+                        $updated++
+
+                        # Ensure in DG
+                        if (-not $dgMemberEmails.ContainsKey($email.ToLower())) {
+                            Write-Host "  Adding to distribution group: $DistributionGroup"
+                            Add-DistributionGroupMember -Identity $DistributionGroup -Member $email -ErrorAction Stop
+                            $dgMemberEmails[$email.ToLower()] = $true
+                        }
+                    }
                     else {
-                        Write-Host "  Already in distribution group"
+                        # Contact doesn't exist - create it
+                        Write-Host "  Creating new contact"
+
+                        # Generate base alias from email prefix
+                        $baseAlias = $email.Split('@')[0] -replace '[^a-zA-Z0-9]', ''
+
+                        # Create contact (CustomAttribute1 will be set in batch later)
+                        $newContact = New-MailContactWithRetry `
+                            -Email $email `
+                            -DisplayName $displayName `
+                            -BaseAlias $baseAlias `
+                            -FirstName $firstName `
+                            -LastName $lastName `
+                            -CustomAttributeValue $CustomAttributeValue
+
+                        if ($newContact) {
+                            # Store email and DG info for batch processing after replication
+                            $newContact.NeedsAddToDG = -not $dgMemberEmails.ContainsKey($email.ToLower())
+                            $newlyCreatedContacts += $newContact
+                        }
+                        $created++
                     }
                 }
 
