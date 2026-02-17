@@ -77,15 +77,10 @@ function New-MailContactWithRetry {
                 -ErrorAction Stop | Out-Null
 
             Write-Host "  Created contact with alias: $finalAlias"
-
-            # Brief pause to allow Exchange to propagate (reduced from 2s)
-            Start-Sleep -Milliseconds 500
-
-            Set-MailContact -Identity $Email `
-                -CustomAttribute1 $CustomAttributeValue `
-                -ErrorAction Stop
-
             $created = $true
+
+            # Return email for batch CustomAttribute1 update later
+            return @{ Email = $Email; CustomAttributeValue = $CustomAttributeValue }
 
         }
         catch {
@@ -164,6 +159,9 @@ function Sync-ContactsFromExcel {
         # Track emails in Excel for removal check later
         $excelEmails = @{}
 
+        # Collect newly created contacts for batch CustomAttribute1 update
+        $newlyCreatedContacts = @()
+
         foreach ($contact in $contacts) {
             try {
                 # Handle both column name formats
@@ -220,8 +218,8 @@ function Sync-ContactsFromExcel {
                     # Generate base alias from email prefix
                     $baseAlias = $email.Split('@')[0] -replace '[^a-zA-Z0-9]', ''
 
-                    # Create with retry logic for alias conflicts
-                    $finalAlias = New-MailContactWithRetry `
+                    # Create contact (CustomAttribute1 will be set in batch later)
+                    $newContact = New-MailContactWithRetry `
                         -Email $email `
                         -DisplayName $displayName `
                         -BaseAlias $baseAlias `
@@ -229,6 +227,9 @@ function Sync-ContactsFromExcel {
                         -LastName $lastName `
                         -CustomAttributeValue $CustomAttributeValue
 
+                    if ($newContact) {
+                        $newlyCreatedContacts += $newContact
+                    }
                     $created++
                 }
 
@@ -258,6 +259,25 @@ function Sync-ContactsFromExcel {
                     Email = $email
                     DisplayName = $displayName
                     Status = "Failed: $_"
+                }
+            }
+        }
+
+        # Batch update CustomAttribute1 for newly created contacts
+        if ($newlyCreatedContacts.Count -gt 0) {
+            Write-Host "`nSetting CustomAttribute1 on $($newlyCreatedContacts.Count) newly created contacts..."
+            Start-Sleep -Seconds 3  # Give Exchange time to replicate
+
+            foreach ($newContact in $newlyCreatedContacts) {
+                try {
+                    Set-MailContact -Identity $newContact.Email `
+                        -CustomAttribute1 $newContact.CustomAttributeValue `
+                        -ErrorAction Stop
+                    Write-Host "  Set attribute on: $($newContact.Email)"
+                }
+                catch {
+                    Write-Warning "  Failed to set attribute on $($newContact.Email): $_"
+                    $errors += "Failed to set CustomAttribute1 on $($newContact.Email): $_"
                 }
             }
         }
