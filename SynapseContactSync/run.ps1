@@ -1,7 +1,7 @@
 # SynapseContactSync - Azure Function for Synapse Accounting T1 Contact Management
 # Syncs contacts from SharePoint Excel file to Exchange Online Distribution List
 # Runs daily at 6:00 AM UTC
-#v2.1
+#v2.2
 param($Timer)
 
 $currentUTCtime = (Get-Date).ToUniversalTime()
@@ -228,19 +228,22 @@ function Sync-ContactsFromExcel {
                         -CustomAttributeValue $CustomAttributeValue
 
                     if ($newContact) {
+                        # Store email and DG info for batch processing after replication
+                        $newContact.NeedsAddToDG = -not $dgMemberEmails.ContainsKey($email.ToLower())
                         $newlyCreatedContacts += $newContact
                     }
                     $created++
                 }
-
-                # Add to distribution group if not already a member
-                if (-not $dgMemberEmails.ContainsKey($email.ToLower())) {
-                    Write-Host "  Adding to distribution group: $DistributionGroup"
-                    Add-DistributionGroupMember -Identity $DistributionGroup -Member $email -ErrorAction Stop
-                    $dgMemberEmails[$email.ToLower()] = $true
-                }
                 else {
-                    Write-Host "  Already in distribution group"
+                    # Only add existing contacts to DG immediately (they're already replicated)
+                    if (-not $dgMemberEmails.ContainsKey($email.ToLower())) {
+                        Write-Host "  Adding to distribution group: $DistributionGroup"
+                        Add-DistributionGroupMember -Identity $DistributionGroup -Member $email -ErrorAction Stop
+                        $dgMemberEmails[$email.ToLower()] = $true
+                    }
+                    else {
+                        Write-Host "  Already in distribution group"
+                    }
                 }
 
                 $processedContacts += @{
@@ -263,12 +266,13 @@ function Sync-ContactsFromExcel {
             }
         }
 
-        # Batch update CustomAttribute1 for newly created contacts
+        # Batch update CustomAttribute1 and add to DG for newly created contacts
         if ($newlyCreatedContacts.Count -gt 0) {
-            Write-Host "`nSetting CustomAttribute1 on $($newlyCreatedContacts.Count) newly created contacts..."
+            Write-Host "`nProcessing $($newlyCreatedContacts.Count) newly created contacts (setting attributes and adding to DG)..."
             Start-Sleep -Seconds 3  # Give Exchange time to replicate
 
             foreach ($newContact in $newlyCreatedContacts) {
+                # Set CustomAttribute1
                 try {
                     Set-MailContact -Identity $newContact.Email `
                         -CustomAttribute1 $newContact.CustomAttributeValue `
@@ -278,6 +282,18 @@ function Sync-ContactsFromExcel {
                 catch {
                     Write-Warning "  Failed to set attribute on $($newContact.Email): $_"
                     $errors += "Failed to set CustomAttribute1 on $($newContact.Email): $_"
+                }
+
+                # Add to distribution group
+                if ($newContact.NeedsAddToDG) {
+                    try {
+                        Add-DistributionGroupMember -Identity $DistributionGroup -Member $newContact.Email -ErrorAction Stop
+                        Write-Host "  Added to DG: $($newContact.Email)"
+                    }
+                    catch {
+                        Write-Warning "  Failed to add to DG $($newContact.Email): $_"
+                        $errors += "Failed to add to DG $($newContact.Email): $_"
+                    }
                 }
             }
         }
